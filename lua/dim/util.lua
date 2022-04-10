@@ -1,8 +1,9 @@
-local highlighter = require("vim.treesitter.highlighter")
-local ts_utils = require("nvim-treesitter.ts_utils")
-local dim = {}
+local M = {}
 
-dim.get_treesitter_nodes = function(buf, ns, row, col, end_col)
+local ts_utils = require "nvim-treesitter.ts_utils"
+local highlighter = require "vim.treesitter.highlighter"
+
+M.get_treesitter_nodes = function(buf, row, col, end_col)
   local self = highlighter.active[buf]
   if not self then
     return {}
@@ -37,43 +38,8 @@ dim.get_treesitter_nodes = function(buf, ns, row, col, end_col)
   if not final then
     return
   end
-  local unused_group = final.ts_group .. "Unused"
-  ts_utils.highlight_node(final.node, buf, ns, unused_group)
-  vim.api.nvim_buf_add_highlight(buf, ns, unused_group, row, col, end_col)
-  return final.ts_group
-end
-dim.get_treesitter_hl = function(buf, row, col)
-  local self = highlighter.active[buf]
-  if not self then
-    return {}
-  end
-  local matches = {}
-  self.tree:for_each_tree(function(tstree, tree)
-    if not tstree then
-      return
-    end
-    local root = tstree:root()
-    local root_start_row, _, root_end_row, _ = root:range()
-    if root_start_row > row or root_end_row < row then
-      return
-    end
-    local query = self:get_query(tree:lang())
-    if not query:query() then
-      return
-    end
-    local iter = query:query():iter_captures(root, self.bufnr, row, row + 1)
-    for capture, node, _ in iter do
-      local hl = query.hl_cache[capture]
-      if hl and ts_utils.is_in_node_range(node, row, col) then
-        local c = query._query.captures[capture]
-        if c ~= nil then
-          local general_hl = query:_get_hl_from_capture(capture)
-          table.insert(matches, general_hl)
-        end
-      end
-    end
-  end, true)
-  return matches
+  local unused_group = final.ts_group
+  return unused_group
 end
 
 local hex_to_rgb = function(hex_str)
@@ -95,8 +61,8 @@ local blend = function(fg, bg, alpha)
   return string.format("#%02X%02X%02X", blendChannel(1), blendChannel(2), blendChannel(3))
 end
 
-dim.darken = function(hex, amount, bg)
+M.darken = function(hex, amount, bg)
   return blend(hex, bg or "#000000", math.abs(amount))
 end
 
-return dim
+return M
