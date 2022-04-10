@@ -3,6 +3,8 @@ local results = {}
 setmetatable(results, { __mode = "v" }) -- make values weak
 local dim = {}
 local hl_map = {}
+dim.hl = nil
+dim.timer = vim.loop.new_timer()
 
 dim.marks = {}
 dim.diag = {}
@@ -56,18 +58,16 @@ dim.detect_unused = function(diagnostics)
     end
     return false
   end
-  return is_list and vim.tbl_filter(unused, diagnostics) or unused(diagnostics)
+  return is_list and vim.tbl_filter(unused, diagnostics) or unused(diagnostics) or {}
 end
 
-local function create_diagnostic_extmark(bufnr, ns, diagnostic, hl)
+local function create_diagnostic_extmark(bufnr, ns, diagnostic)
   local function get_hl_group()
-    if not hl then
-      local ts_group = get_ts_group(bufnr, diagnostic.lnum, diagnostic.col, diagnostic.end_col)
-      if not ts_group then return end
-      return set_unused_group(ts_group)
-    end
+    local ts_group = get_ts_group(bufnr, diagnostic.lnum, diagnostic.col, diagnostic.end_col)
+    if not ts_group then return end
+    return set_unused_group(ts_group)
   end
-  local unused_group = hl or get_hl_group()
+  local unused_group = dim.hl or get_hl_group()
   if not unused_group then return end
   return vim.api.nvim_buf_set_extmark(bufnr, ns, diagnostic.lnum, diagnostic.col, {
     end_line = diagnostic.lnum,
@@ -79,18 +79,21 @@ local function create_diagnostic_extmark(bufnr, ns, diagnostic, hl)
   })
 end
 
-local update = function (hl)
+local clear_extmarks = function()
+  for _, mark in ipairs(dim.marks[dim.bufnr]) do
+    vim.api.nvim_buf_del_extmark(dim.bufnr, dim.ns, mark)
+  end
+  dim.marks[dim.bufnr] = {}
+end
+local update = function ()
   if not dim.diagnostics or not dim.bufnr then return end
   local filtered = dim.detect_unused(dim.diagnostics)
   dim.diag = filtered
   if not dim.marks[dim.bufnr] then dim.marks[dim.bufnr] = {} end
   local locs = {}
-  for _, mark in ipairs(dim.marks[dim.bufnr]) do
-    vim.api.nvim_buf_del_extmark(dim.bufnr, dim.ns, mark)
-  end
-  dim.marks[dim.bufnr] = {}
+  clear_extmarks()
   for _, diagnostic in ipairs(dim.diag) do
-    local ext = create_diagnostic_extmark(dim.bufnr, dim.ns, diagnostic, hl)
+    local ext = create_diagnostic_extmark(dim.bufnr, dim.ns, diagnostic)
     if ext then
       table.insert(locs, format_loc(diagnostic))
       table.insert(dim.marks[dim.bufnr], ext)
@@ -98,23 +101,48 @@ local update = function (hl)
   end
 end
 
-dim.setup = function(opts)
-  dim.ns = vim.api.nvim_create_namespace("dim")
-  if opts and opts.hl then
-    vim.api.nvim_set_hl(0, "Unused", opts.hl)
-    dim.hl = "Unused"
-  end
-  vim.api.nvim_create_autocmd({"TextYankPost", "ModeChanged"}, {
+local create_autocmds_and_timer_start = function ()
+  vim.api.nvim_create_autocmd({"TextYankPost"}, {
     callback = function ()
-      vim.lsp.buf_notify(0, 'textDocument/didChange')
+      local current_diag = dim.detect_unused(vim.diagnostic.get(dim.bufnr, {severity = vim.diagnostic.severity.HINT}))
+      vim.lsp.buf_notify(dim.bufnr, 'textDocument/didChange')
     end,
     once = false
   })
+  vim.api.nvim_create_autocmd({"InsertLeave"}, {
+    callback = function ()
+      dim.diagnostics= dim.detect_unused(vim.diagnostic.get(dim.bufnr, {severity = vim.diagnostic.severity.HINT}))
+      dim.timer:start(0, 100, vim.schedule_wrap(function()
+        if not vim.tbl_isempty(dim.diagnostics) then
+          update()
+        end
+      end))
+    end,
+    once = false
+  })
+  vim.api.nvim_create_autocmd({"InsertEnter"}, {
+    callback = function ()
+      dim.diagnostics= dim.detect_unused(vim.diagnostic.get(dim.bufnr, {severity = vim.diagnostic.severity.HINT}))
+      vim.schedule(function()
+        dim.timer:stop()
+      end)
+    end,
+    once = false
+  })
+end
+
+dim.setup = function(params)
+  dim.ns = vim.api.nvim_create_namespace("dim")
+  if params and params.hl then
+    vim.api.nvim_set_hl(0, "Unused", params.hl)
+    dim.hl = "Unused"
+  end
+  create_autocmds_and_timer_start()
   vim.diagnostic.handlers["dim/unused"] = {
     show = function(_, bufnr, diagnostics, _)
       dim.diagnostics = diagnostics
       dim.bufnr = bufnr
-      update(dim.hl)
+      vim.schedule(function() update() end)
     end
   }
 end
