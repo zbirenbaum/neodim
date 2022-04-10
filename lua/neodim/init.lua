@@ -104,18 +104,15 @@ end
 local create_autocmds_and_timer_start = function ()
   vim.api.nvim_create_autocmd({"TextYankPost"}, {
     callback = function ()
-      local current_diag = dim.detect_unused(vim.diagnostic.get(dim.bufnr, {severity = vim.diagnostic.severity.HINT}))
       vim.lsp.buf_notify(dim.bufnr, 'textDocument/didChange')
     end,
     once = false
   })
   vim.api.nvim_create_autocmd({"InsertLeave"}, {
     callback = function ()
-      dim.diagnostics= dim.detect_unused(vim.diagnostic.get(dim.bufnr, {severity = vim.diagnostic.severity.HINT}))
       dim.timer:start(0, 100, vim.schedule_wrap(function()
-        if not vim.tbl_isempty(dim.diagnostics) then
-          update()
-        end
+        dim.diagnostics= dim.detect_unused(vim.diagnostic.get(dim.bufnr, {severity = vim.diagnostic.severity.HINT}))
+        update()
       end))
     end,
     once = false
