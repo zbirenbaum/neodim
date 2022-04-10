@@ -1,4 +1,4 @@
-local util = require("dim.util")
+local util = require("neodim.util")
 local results = {}
 setmetatable(results, { __mode = "v" }) -- make values weak
 local dim = {}
