@@ -79,7 +79,7 @@ local function create_diagnostic_extmark(bufnr, ns, diagnostic, hl)
   })
 end
 
-local update = function (hl, ephemeral)
+local update = function (hl)
   if not dim.diagnostics or not dim.bufnr then return end
   local filtered = dim.detect_unused(dim.diagnostics)
   dim.diag = filtered
@@ -104,7 +104,7 @@ dim.setup = function(opts)
     vim.api.nvim_set_hl(0, "Unused", opts.hl)
     dim.hl = "Unused"
   end
-  vim.api.nvim_create_autocmd({"TextYankPost"}, {
+  vim.api.nvim_create_autocmd({"TextYankPost", "ModeChanged"}, {
     callback = function ()
       vim.lsp.buf_notify(0, 'textDocument/didChange')
     end,
