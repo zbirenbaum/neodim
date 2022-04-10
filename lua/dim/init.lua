@@ -5,6 +5,9 @@ local dim = {}
 local hl_map = {}
 
 dim.marks = {}
+dim.diag = {}
+dim.diagnostics = nil
+dim.bufnr = nil
 
 local function get_ts_group(bufnr, lnum, col, end_col)
   local ts_group = util.get_treesitter_nodes(bufnr, lnum, col, end_col)
@@ -76,27 +79,42 @@ local function create_diagnostic_extmark(bufnr, ns, diagnostic, hl)
   })
 end
 
+local update = function (hl, ephemeral)
+  if not dim.diagnostics or not dim.bufnr then return end
+  local filtered = dim.detect_unused(dim.diagnostics)
+  dim.diag = filtered
+  if not dim.marks[dim.bufnr] then dim.marks[dim.bufnr] = {} end
+  local locs = {}
+  for _, mark in ipairs(dim.marks[dim.bufnr]) do
+    vim.api.nvim_buf_del_extmark(dim.bufnr, dim.ns, mark)
+  end
+  dim.marks[dim.bufnr] = {}
+  for _, diagnostic in ipairs(dim.diag) do
+    local ext = create_diagnostic_extmark(dim.bufnr, dim.ns, diagnostic, hl)
+    if ext then
+      table.insert(locs, format_loc(diagnostic))
+      table.insert(dim.marks[dim.bufnr], ext)
+    end
+  end
+end
+
 dim.setup = function(opts)
   dim.ns = vim.api.nvim_create_namespace("dim")
   if opts and opts.hl then
     vim.api.nvim_set_hl(0, "Unused", opts.hl)
+    dim.hl = "Unused"
   end
+  vim.api.nvim_create_autocmd({"TextYankPost"}, {
+    callback = function ()
+      vim.lsp.buf_notify(0, 'textDocument/didChange')
+    end,
+    once = false
+  })
   vim.diagnostic.handlers["dim/unused"] = {
     show = function(_, bufnr, diagnostics, _)
-      if not dim.marks[bufnr] then dim.marks[bufnr] = {} end
-      local locs = {}
-      local filtered = dim.detect_unused(diagnostics)
-      for _, mark in ipairs(dim.marks[bufnr]) do
-        vim.api.nvim_buf_del_extmark(bufnr, dim.ns, mark)
-      end
-      dim.marks[bufnr] = {}
-      for _, diagnostic in ipairs(filtered) do
-        local ext = create_diagnostic_extmark(bufnr, dim.ns, diagnostic)
-        if ext then
-          table.insert(locs, format_loc(diagnostic))
-          table.insert(dim.marks[bufnr], ext)
-        end
-      end
+      dim.diagnostics = diagnostics
+      dim.bufnr = bufnr
+      update(dim.hl)
     end
   }
 end
