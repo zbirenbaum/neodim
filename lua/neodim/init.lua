@@ -105,19 +105,17 @@ local create_autocmds_and_timer_start = function (timer_debounce)
     end,
     once = false
   })
-  if vim.bo.filetype ~= "python" then
-    vim.api.nvim_create_autocmd({"InsertLeave"}, {
-      callback = vim.schedule_wrap(function ()
-        dim.timer:start(0, timer_debounce, vim.schedule_wrap(function()
-          local diagnostics = vim.diagnostic.get(0, {})
-          local buf_marks = vim.api.nvim_buf_get_extmarks(0, dim.ns, 0, -1, {})
-          clear_extmarks(vim.api.nvim_get_current_buf(), diagnostics, buf_marks)
-          vim.lsp.buf_notify(dim.bufnr, 'textDocument/didChange')
-        end))
-      end),
-      once = false
-    })
-  end
+  vim.api.nvim_create_autocmd({"InsertLeave"}, {
+    callback = vim.schedule_wrap(function ()
+      dim.timer:start(0, timer_debounce, vim.schedule_wrap(function()
+        local diagnostics = vim.diagnostic.get(0, {})
+        local buf_marks = vim.api.nvim_buf_get_extmarks(0, dim.ns, 0, -1, {})
+        clear_extmarks(vim.api.nvim_get_current_buf(), diagnostics, buf_marks)
+        vim.lsp.buf_notify(dim.bufnr, 'textDocument/didChange')
+      end))
+    end),
+    once = false
+  })
   vim.api.nvim_create_autocmd({"InsertEnter"}, {
     callback = vim.schedule_wrap(function ()
       dim.timer:stop()
@@ -135,7 +133,13 @@ dim.setup = function(params)
   local timer_debounce = params and params.timer_debounce or 200
   dim.timer = vim.loop.new_timer()
   dim.marks = {}
-  create_autocmds_and_timer_start(timer_debounce)
+  if params.ft_disable then
+    if not vim.tbl_contains(params.ft_disable, vim.bo.filetype) then
+      create_autocmds_and_timer_start(timer_debounce)
+    end
+  else
+    create_autocmds_and_timer_start(timer_debounce)
+  end
   vim.diagnostic.handlers["dim/unused"] = {
     show = function(_, bufnr, diagnostics, _)
       dim.marks[bufnr] = dim.marks[bufnr] or {}
