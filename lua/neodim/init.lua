@@ -98,31 +98,6 @@ local update = function (bufnr, filtered, buf_marks)
   end
 end
 
-local create_autocmds_and_timer_start = function (timer_debounce)
-  vim.api.nvim_create_autocmd({"TextYankPost"}, {
-    callback = function ()
-      vim.lsp.buf_notify(dim.bufnr, 'textDocument/didChange')
-    end,
-    once = false
-  })
-  vim.api.nvim_create_autocmd({"InsertLeave"}, {
-    callback = vim.schedule_wrap(function ()
-      dim.timer:start(0, timer_debounce, vim.schedule_wrap(function()
-        local diagnostics = vim.diagnostic.get(0, {})
-        local buf_marks = vim.api.nvim_buf_get_extmarks(0, dim.ns, 0, -1, {})
-        clear_extmarks(vim.api.nvim_get_current_buf(), diagnostics, buf_marks)
-        vim.lsp.buf_notify(dim.bufnr, 'textDocument/didChange')
-      end))
-    end),
-    once = false
-  })
-  vim.api.nvim_create_autocmd({"InsertEnter"}, {
-    callback = vim.schedule_wrap(function ()
-      dim.timer:stop()
-    end),
-    once = false
-  })
-end
 
 dim.setup = function(params)
   dim.ns = vim.api.nvim_create_namespace("dim")
@@ -131,21 +106,35 @@ dim.setup = function(params)
     dim.hl = "Unused"
   end
   local timer_debounce = params and params.timer_debounce or 200
+  timer_debounce = timer_debounce < 0 and 0 or timer_debounce
   dim.timer = vim.loop.new_timer()
   dim.marks = {}
-  if params.ft_disable then
-    if not vim.tbl_contains(params.ft_disable, vim.bo.filetype) then
-      create_autocmds_and_timer_start(timer_debounce)
-    end
-  else
-    create_autocmds_and_timer_start(timer_debounce)
-  end
+  dim.diagnostics= {}
   vim.diagnostic.handlers["dim/unused"] = {
     show = function(_, bufnr, diagnostics, _)
       dim.marks[bufnr] = dim.marks[bufnr] or {}
       dim.marks[bufnr] = vim.api.nvim_buf_get_extmarks(bufnr, dim.ns, 0, -1, {})
       local filtered = dim.detect_unused(diagnostics)
-      vim.schedule(function() update(bufnr, filtered, dim.marks[bufnr]) end)
+      dim.diagnostics[bufnr] = dim.diagnostics[bufnr] or {}
+      dim.diagnostics[bufnr]['current'] = dim.diagnostics[bufnr]['current'] or {}
+      dim.diagnostics[bufnr]['prev'] = dim.diagnostics[bufnr]['current']
+      dim.diagnostics[bufnr]['current'] = filtered
+      vim.schedule(function() update(bufnr, dim.diagnostics[bufnr]['current'], dim.marks[bufnr]) end)
+    end,
+    hide = function (_, bufnr)
+      local d_buf = dim.diagnostics[bufnr]
+      if not d_buf or not d_buf.current or not d_buf.prev then return end
+      d_buf.current = vim.tbl_filter(function(t)
+        for _, v in ipairs(d_buf.prev) do
+          if v.lnum == t.lnum and v.message:gsub('j', '') == t.message:gsub('j', '') then
+            return false
+          else
+            return true
+          end
+        end
+      end, d_buf.current)
+      print(vim.inspect(d_buf.current))
+      vim.schedule(function() update(bufnr, d_buf.current, dim.marks[bufnr]) end)
     end
   }
 end
