@@ -126,14 +126,9 @@ dim.setup = function(params)
       if not d_buf or not d_buf.current or not d_buf.prev then return end
       d_buf.current = vim.tbl_filter(function(t)
         for _, v in ipairs(d_buf.prev) do
-          if v.lnum == t.lnum and v.message:gsub('j', '') == t.message:gsub('j', '') then
-            return false
-          else
-            return true
-          end
+          return v.lnum ~= t.lnum or v.message:gsub('j','') ~= t.message:gsub('j','')
         end
       end, d_buf.current)
-      print(vim.inspect(d_buf.current))
       vim.schedule(function() update(bufnr, d_buf.current, dim.marks[bufnr]) end)
     end
   }
