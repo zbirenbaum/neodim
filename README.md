@@ -12,14 +12,14 @@ The plugin is finally out of early alpha, and I appear to have it stable. Gettin
 use {
   "zbirenbaum/neodim",
   config = function ()
-    require("dim").setup()
+    require("neodim").setup()
   end
 }
 ```
 ### How to remove vtext from dimmed diagnostics: 
 - Add the following to your diagnostic config:
 
-`require("dim").ignore_vtext(diagnostic)`
+`require("neodim").ignore_vtext(diagnostic)`
 
 - For example:
 
@@ -28,7 +28,7 @@ vim.diagnostic.config({
   virtual_text = {
     prefix = "",
     format = function(diagnostic)
-      return require("dim").ignore_vtext(diagnostic)
+      return require("neodim").ignore_vtext(diagnostic)
     end,
   },
   signs = true,
