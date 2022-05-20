@@ -31,24 +31,26 @@ local function set_unused_group(ts_group)
   return unused_group
 end
 
-dim.ignore_vtext = function(diagnostic)
-  return not dim.detect_unused(diagnostic) and diagnostic.message or nil
-end
-
 local format_loc_ext = function (diagnostic)
   return { diagnostic.lnum, diagnostic.col }
 end
 
+local is_unused = function(diagnostic)
+  if diagnostic.severity == vim.diagnostic.severity.HINT then
+    local tags = diagnostic.tags or diagnostic.user_data.lsp.tags
+    return tags and vim.tbl_contains(tags, vim.lsp.protocol.DiagnosticTag.Unnecessary)
+  end
+  return false
+end
+
+dim.ignore_vtext = function(diagnostic)
+  local unused = vim.tbl_islist(diagnostic) and not dim.detect_unused(diagnostic) or not is_unused(diagnostic)
+  return unused and diagnostic.message or nil
+end
+
 dim.detect_unused = function(diagnostics)
   local is_list = vim.tbl_islist(diagnostics)
-  local unused = function(diagnostic)
-    if diagnostic.severity == vim.diagnostic.severity.HINT then
-      local tags = diagnostic.tags or diagnostic.user_data.lsp.tags
-      return tags and vim.tbl_contains(tags, vim.lsp.protocol.DiagnosticTag.Unnecessary)
-    end
-    return false
-  end
-  return is_list and vim.tbl_filter(unused, diagnostics) or unused(diagnostics) or {}
+  return is_list and vim.tbl_filter(is_unused, diagnostics) or is_unused(diagnostics) or {}
 end
 
 local function create_diagnostic_extmark(bufnr, ns, diagnostic)
