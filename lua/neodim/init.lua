@@ -37,7 +37,7 @@ end
 
 local is_unused = function(diagnostic)
   if diagnostic.severity == vim.diagnostic.severity.HINT then
-    local tags = diagnostic.tags or diagnostic.user_data.lsp.tags
+    local tags = diagnostic.tags or vim.tbl_get(diagnostic, "user_data", "lsp", "tags")
     return tags and vim.tbl_contains(tags, vim.lsp.protocol.DiagnosticTag.Unnecessary)
   end
   return false
