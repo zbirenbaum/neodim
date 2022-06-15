@@ -36,11 +36,12 @@ local format_loc_ext = function (diagnostic)
 end
 
 local is_unused = function(diagnostic)
-  if diagnostic.severity == vim.diagnostic.severity.HINT then
-    local tags = diagnostic.tags or vim.tbl_get(diagnostic, "user_data", "lsp", "tags")
-    return tags and vim.tbl_contains(tags, vim.lsp.protocol.DiagnosticTag.Unnecessary)
+  local diag_info = diagnostic.tags or vim.tbl_get(diagnostic, "user_data", "lsp", "tags") or diagnostic.code
+  if type(diag_info) == "table" then
+    return diag_info and vim.tbl_contains(diag_info, vim.lsp.protocol.DiagnosticTag.Unnecessary)
+  elseif type(diag_info) == "string" then
+    return string.find(diag_info, ".*[uU]nused.*") ~= nil
   end
-  return false
 end
 
 dim.ignore_vtext = function(diagnostic)
