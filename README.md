@@ -7,7 +7,8 @@ The plugin is finally out of early alpha, and I appear to have it stable. Gettin
 
 ### Setup:
 
-- Install the plugin like any other:
+Install the plugin like any other:
+
 ```
 use {
   "zbirenbaum/neodim",
@@ -16,23 +17,36 @@ use {
   end
 }
 ```
+
+### How to get live dim updates as you type
+
+The vim.diagnostic.config function provides hooks which allow you to affect the behavior of this plugin. Setting `update_in_insert` to true will cause the plugin to update as fast as your LSP can supply diagnostic info. I personally find it preferable to keep this value at false, but the option is there and I recommend trying both out to see which you prefer.
+
+Example:
+```
+vim.diagnostic.config({
+  ...
+  update_in_insert = true, -- Set this to true for live dim updates as you type
+  ...
+})
+```
+
 ### How to remove vtext from dimmed diagnostics: 
-- Add the following to your diagnostic config:
+
+Add the following to your diagnostic config:
 
 `require("neodim").ignore_vtext(diagnostic)`
 
-- For example:
+Example:
 
 ```
 vim.diagnostic.config({
   virtual_text = {
-    prefix = "",
+    ...
     format = function(diagnostic)
       return require("neodim").ignore_vtext(diagnostic)
     end,
+    ...
   },
-  signs = true,
-  underline = false,
-  update_in_insert = false,
 })
 ```
