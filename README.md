@@ -12,10 +12,41 @@ Install the plugin like any other:
 ```
 use {
   "zbirenbaum/neodim",
+  event = "LspAttach",
   config = function ()
-    require("neodim").setup()
+    require("neodim").setup({
+      hide = {
+        virtual_text = true,
+        signs = true,
+        underline = true,
+      }
+    })
   end
 }
+```
+
+### Options:
+
+All decorations can be hidden for diagnostics pertaining to unused tokens. By default, hiding all of them is enabled, but you can re-enable them by changing the config table passed to neodim. It is important to note that regardless of what you put in this configuration, neodim will always respect settings created with `vim.diagnostic.config`. For example, if all underline decorations are disabled by running `vim.diagnostic.config({ underline=false })`, neodim will ***not*** re-enable them for "unused" diagnostics.
+
+Example:
+
+```
+-- re-enable only sign decorations for 'unused' diagnostics
+require("neodim").setup({
+  hide = {signs = false }
+})
+```
+
+```
+-- renable all decorations for 'unused' diagnostics
+require("neodim").setup({
+  hide = {
+    virtual_text = false,
+    signs = false,
+    underline = false,
+  }
+})
 ```
 
 ### How to get live dim updates as you type
@@ -28,25 +59,5 @@ vim.diagnostic.config({
   ...
   update_in_insert = true, -- Set this to true for live dim updates as you type
   ...
-})
-```
-
-### How to remove vtext from dimmed diagnostics: 
-
-Add the following to your diagnostic config:
-
-`require("neodim").ignore_vtext(diagnostic)`
-
-Example:
-
-```
-vim.diagnostic.config({
-  virtual_text = {
-    ...
-    format = function(diagnostic)
-      return require("neodim").ignore_vtext(diagnostic)
-    end,
-    ...
-  },
 })
 ```

@@ -101,8 +101,43 @@ local update = function (bufnr, filtered, buf_marks)
   end
 end
 
+local hide_unused_decorations = function (decorations)
+  local diag = vim.diagnostic -- updates globally
+  local d_handlers = vim.tbl_extend("force", {}, require("vim.diagnostic").handlers) -- gets a copy
+
+  -- returns a list of all non-unused if invert is false, or all unused decorations if invert is true
+  local filter_unused = function (diagnostics, invert)
+    local is_used = function(d)
+      local unused = vim.tbl_islist(d) and not dim.detect_unused(d) or not is_unused(d)
+      return unused and d.message or nil
+    end
+
+    return vim.tbl_filter(function(d)
+      if invert then return not is_used(d) end
+      return is_used(d)
+    end, diagnostics)
+  end
+
+  local create_handler = function (d_handler)
+    return {
+      show = function (namespace, bufnr, diagnostics, opts)
+        diagnostics = filter_unused(diagnostics)
+        d_handlers[d_handler].show(namespace, bufnr, diagnostics, opts)
+      end,
+      hide = d_handlers[d_handler].hide
+    }
+  end
+
+  for d_handler, enable in pairs(decorations) do
+    diag.handlers[d_handler] = enable and create_handler(d_handler) or d_handlers[d_handler]
+  end
+end
 
 dim.setup = function(params)
+  local defaults = { hide = { underline = true, virtual_text = true, signs = true } }
+  params = vim.tbl_deep_extend("force", defaults, params or {})
+  hide_unused_decorations(params.hide)
+
   dim.ns = vim.api.nvim_create_namespace("dim")
   if params and params.hl then
     vim.api.nvim_set_hl(0, "Unused", params.hl)
