@@ -141,17 +141,17 @@ dim.create_dim_handler = function (namespace)
         vim.api.nvim_buf_clear_namespace(bufnr, namespace, m[2], m[2]+1)
       end
     end
-    return vim.api.nvim_buf_get_extmarks(0, namespace, 0, -1, {})
+    local marks = vim.api.nvim_buf_get_extmarks(0, namespace, 0, -1, {})
   end
 
   local show = function(_, bufnr, diagnostics, _)
-    local marks = vim.api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {})
+    local marks = refresh(bufnr)
     diagnostics = filter_unused(vim.diagnostic.get(bufnr, {}), true)
-    refresh(bufnr)
     add_new_marks(diagnostics, marks)
   end
 
   local hide = function(_, bufnr, diagnostics, _)
+    refresh(bufnr)
   end
   -- dont need a hide function
   return { show = show, hide = hide}
