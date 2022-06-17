@@ -1,8 +1,10 @@
 local util = require("neodim.util")
 local results = {}
+
 setmetatable(results, { __mode = "v" }) -- make values weak
 local dim = {}
-local hl_map = {}
+dim.marks = {}
+dim.hl_map = {}
 
 local exists_or_init = function (t) return t or {} end
 
@@ -12,7 +14,7 @@ local function get_ts_group(bufnr, lnum, col, end_col)
   return ts_group
 end
 
-local function set_unused_group(ts_group)
+dim.get_unused_group = function(ts_group)
   local darkened = function(color)
     if not results[color] then
       results[color] = util.darken(color, 0.75)
@@ -20,7 +22,7 @@ local function set_unused_group(ts_group)
     return results[color]
   end
   local unused_group = string.format("%sUnused", ts_group)
-  if hl_map[unused_group] then
+  if dim.hl_map[unused_group] then
     return unused_group
   end
   local hl = vim.api.nvim_get_hl_by_name(ts_group, true)
@@ -28,23 +30,24 @@ local function set_unused_group(ts_group)
   if #color ~= 7 then
     color = "#ffffff"
   end
-  hl_map[unused_group] = { fg = darkened(color), undercurl = false, underline = false }
-  vim.api.nvim_set_hl(0, unused_group, hl_map[unused_group])
+  dim.hl_map[unused_group] = { fg = darkened(color), undercurl = false, underline = false }
+  vim.api.nvim_set_hl(0, unused_group, dim.hl_map[unused_group])
   return unused_group
 end
 
-local function create_diagnostic_extmark(bufnr, ns, diagnostic)
-  local function get_hl_group()
-    local ts_group = get_ts_group(bufnr, diagnostic.lnum, diagnostic.col, diagnostic.end_col)
-    if not ts_group then return end
-    return set_unused_group(ts_group)
-  end
-  local unused_group = dim.hl or get_hl_group()
-  if not unused_group then return end
+dim.get_hl = function (diagnostic)
+  local ts_group = get_ts_group(diagnostic.bufnr, diagnostic.lnum, diagnostic.col, diagnostic.end_col)
+  if not ts_group then return end
+  return dim.get_unused_group(ts_group)
+end
+
+dim.create_diagnostic_extmark = function (bufnr, ns, diagnostic)
+  local hl = dim.get_hl(diagnostic)
+  if not hl then return end
   return vim.api.nvim_buf_set_extmark(bufnr, ns, diagnostic.lnum, diagnostic.col, {
     end_line = diagnostic.lnum,
     end_col = diagnostic.end_col,
-    hl_group = unused_group,
+    hl_group = hl,
     priority = 200,
     end_right_gravity = true,
     strict = false,
@@ -96,17 +99,21 @@ local hide_unused_decorations = function (decorations)
   end
 end
 
-local create_dim_handler = function (namespace)
+dim.create_dim_handler = function (namespace)
   local mark_has_diagnostic = function (diagnostics, mark)
     for _, v in ipairs(diagnostics) do
-      if v.lnum == mark[2] then return true end
+      if v.lnum == mark[2] and math.abs(v.end_col - mark[3]) <= 1 then
+        return true
+      end
     end
     return false
   end
 
   local diagnostic_has_mark = function (diagnostic, marks)
     for _, m in ipairs(marks) do
-      if diagnostic.lnum == m[2] then return true end
+      if diagnostic.lnum == m[2] and math.abs(diagnostic.end_col - m[3]) <= 1 then
+        return true
+      end
     end
     return false
   end
@@ -120,27 +127,34 @@ local create_dim_handler = function (namespace)
   local add_new_marks = function (diagnostics, marks)
     marks = exists_or_init(marks)
     diagnostics = exists_or_init(diagnostics)
-    vim.tbl_map(function (d)
-      create_diagnostic_extmark(d.bufnr, namespace, d)
+    return vim.tbl_map(function (d)
+      return dim.create_diagnostic_extmark(d.bufnr, namespace, d)
     end, get_missing_diag(diagnostics, marks))
   end
 
-  local show = function(_, bufnr, diagnostics, _)
-    if not diagnostics or vim.tbl_isempty(diagnostics) then return end
-
-    local marks = vim.api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {})
-    diagnostics = filter_unused(diagnostics or {}, true)
-    -- remove outdated marks
-    for index, mark in ipairs(marks) do
-      if not mark_has_diagnostic(diagnostics, mark) then
-        marks[index] = nil
-        vim.api.nvim_buf_del_extmark(bufnr, namespace, mark[1])
+  local refresh = function (bufnr)
+    for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, namespace, 0, -1, {})
+) do
+      local d_lnum = filter_unused(vim.diagnostic.get(bufnr, {lnum=m[2]}), true)
+      local m_lnum = vim.api.nvim_buf_get_extmarks(bufnr, namespace, {m[2],0}, {m[2]+1,0}, {})
+      if #d_lnum ~= #m_lnum then
+        vim.api.nvim_buf_clear_namespace(bufnr, namespace, m[2], m[2]+1)
       end
     end
+    return vim.api.nvim_buf_get_extmarks(0, namespace, 0, -1, {})
+  end
+
+  local show = function(_, bufnr, diagnostics, _)
+    local marks = vim.api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {})
+    diagnostics = filter_unused(vim.diagnostic.get(bufnr, {}), true)
+    refresh(bufnr)
     add_new_marks(diagnostics, marks)
   end
+
+  local hide = function(_, bufnr, diagnostics, _)
+  end
   -- dont need a hide function
-  return { show = show }
+  return { show = show, hide = hide}
 end
 
 dim.setup = function(params)
@@ -149,12 +163,7 @@ dim.setup = function(params)
   hide_unused_decorations(params.hide)
 
   dim.ns = vim.api.nvim_create_namespace("dim")
-  if params and params.hl then
-    vim.api.nvim_set_hl(0, "Unused", params.hl)
-    dim.hl = "Unused"
-  end
-
-  vim.diagnostic.handlers["dim/unused"] = create_dim_handler(dim.ns)
+  vim.diagnostic.handlers["dim/unused"] = dim.create_dim_handler(dim.ns)
 end
 
 return dim
