@@ -4,6 +4,8 @@ setmetatable(results, { __mode = "v" }) -- make values weak
 local dim = {}
 local hl_map = {}
 
+local exists_or_init = function (t) return t or {} end
+
 local function get_ts_group(bufnr, lnum, col, end_col)
   local ts_group = util.get_treesitter_nodes(bufnr, lnum, col, end_col)
   ts_group = type(ts_group) == "string" and ts_group or nil
@@ -31,29 +33,6 @@ local function set_unused_group(ts_group)
   return unused_group
 end
 
-local format_loc_ext = function (diagnostic)
-  return { diagnostic.lnum, diagnostic.col }
-end
-
-local is_unused = function(diagnostic)
-  local diag_info = diagnostic.tags or vim.tbl_get(diagnostic, "user_data", "lsp", "tags") or diagnostic.code
-  if type(diag_info) == "table" then
-    return diag_info and vim.tbl_contains(diag_info, vim.lsp.protocol.DiagnosticTag.Unnecessary)
-  elseif type(diag_info) == "string" then
-    return string.find(diag_info, ".*[uU]nused.*") ~= nil
-  end
-end
-
-dim.ignore_vtext = function(diagnostic)
-  local unused = vim.tbl_islist(diagnostic) and not dim.detect_unused(diagnostic) or not is_unused(diagnostic)
-  return unused and diagnostic.message or nil
-end
-
-dim.detect_unused = function(diagnostics)
-  local is_list = vim.tbl_islist(diagnostics)
-  return is_list and vim.tbl_filter(is_unused, diagnostics) or is_unused(diagnostics) or {}
-end
-
 local function create_diagnostic_extmark(bufnr, ns, diagnostic)
   local function get_hl_group()
     local ts_group = get_ts_group(bufnr, diagnostic.lnum, diagnostic.col, diagnostic.end_col)
@@ -66,71 +45,102 @@ local function create_diagnostic_extmark(bufnr, ns, diagnostic)
     end_line = diagnostic.lnum,
     end_col = diagnostic.end_col,
     hl_group = unused_group,
-    priority = 300,
+    priority = 200,
     end_right_gravity = true,
     strict = false,
   })
 end
 
-local mark_in_diagnostics = function (mark, diagnostic_locs)
-  for _, v in ipairs(diagnostic_locs) do
-    if v[1] == mark[2] and v[2] == mark[3] then return true end
+local is_unused = function(diagnostic)
+  local diag_info = diagnostic.tags or vim.tbl_get(diagnostic, "user_data", "lsp", "tags") or diagnostic.code
+  if type(diag_info) == "table" then
+    return diag_info and vim.tbl_contains(diag_info, vim.lsp.protocol.DiagnosticTag.Unnecessary)
+  elseif type(diag_info) == "string" then
+    return string.find(diag_info, ".*[uU]nused.*") ~= nil
   end
-  return false
 end
 
-local clear_extmarks = function(bufnr, diagnostics, buf_marks)
-  local diagnostic_locs = vim.tbl_map(format_loc_ext, diagnostics)
-  local new_marks = vim.tbl_filter(function(mark)
-    if mark_in_diagnostics(mark, diagnostic_locs) then return true
-    else
-      vim.api.nvim_buf_del_extmark(bufnr, dim.ns, mark[1])
-      return false
-    end
-  end, buf_marks)
-  return new_marks
+local detect_unused = function(diagnostics)
+  local is_list = vim.tbl_islist(diagnostics)
+  return is_list and vim.tbl_filter(is_unused, diagnostics) or is_unused(diagnostics) or {}
 end
 
-local update = function (bufnr, filtered, buf_marks)
-  local marks_in_diagnostics = clear_extmarks(bufnr, filtered, buf_marks)
-  for _, diagnostic in ipairs(filtered) do
-    local marks_in_diagnostics_locs = vim.tbl_map(function(mark) return { mark[2], mark[3] } end, marks_in_diagnostics)
-    if not vim.tbl_contains(marks_in_diagnostics_locs, { diagnostic.lnum, diagnostic.col }) then
-      create_diagnostic_extmark(bufnr, dim.ns, diagnostic)
-    end
+-- returns a list of all non-unused if invert is false, or all unused decorations if invert is true
+local filter_unused = function (diagnostics, invert)
+  local is_used = function(d)
+    local unused = vim.tbl_islist(d) and not detect_unused(d) or not is_unused(d)
+    return unused and d.message or nil
   end
+
+  return vim.tbl_filter(function(d)
+    if invert then return not is_used(d) end
+    return is_used(d)
+  end, diagnostics)
+end
+
+local create_handler = function (old_handler)
+  return {
+    show = function (namespace, bufnr, diagnostics, opts)
+      diagnostics = filter_unused(diagnostics)
+      old_handler.show(namespace, bufnr, diagnostics, opts)
+    end,
+    hide = old_handler.hide
+  }
 end
 
 local hide_unused_decorations = function (decorations)
+  local handlers_copy = vim.tbl_extend("force", {}, require("vim.diagnostic").handlers) -- gets a copy
   local diag = vim.diagnostic -- updates globally
-  local d_handlers = vim.tbl_extend("force", {}, require("vim.diagnostic").handlers) -- gets a copy
+  for d_handler, enable in pairs(decorations) do
+    diag.handlers[d_handler] = enable and create_handler(handlers_copy[d_handler]) or handlers_copy[d_handler]
+  end
+end
 
-  -- returns a list of all non-unused if invert is false, or all unused decorations if invert is true
-  local filter_unused = function (diagnostics, invert)
-    local is_used = function(d)
-      local unused = vim.tbl_islist(d) and not dim.detect_unused(d) or not is_unused(d)
-      return unused and d.message or nil
+local create_dim_handler = function (namespace)
+  local mark_has_diagnostic = function (diagnostics, mark)
+    for _, v in ipairs(diagnostics) do
+      if v.lnum == mark[2] then return true end
     end
+    return false
+  end
 
-    return vim.tbl_filter(function(d)
-      if invert then return not is_used(d) end
-      return is_used(d)
+  local diagnostic_has_mark = function (diagnostic, marks)
+    for _, m in ipairs(marks) do
+      if diagnostic.lnum == m[2] then return true end
+    end
+    return false
+  end
+
+  local get_missing_diag = function (diagnostics, marks)
+    return vim.tbl_filter(function (diagnostic)
+      return not diagnostic_has_mark(diagnostic, marks)
     end, diagnostics)
   end
 
-  local create_handler = function (d_handler)
-    return {
-      show = function (namespace, bufnr, diagnostics, opts)
-        diagnostics = filter_unused(diagnostics)
-        d_handlers[d_handler].show(namespace, bufnr, diagnostics, opts)
-      end,
-      hide = d_handlers[d_handler].hide
-    }
+  local add_new_marks = function (diagnostics, marks)
+    marks = exists_or_init(marks)
+    diagnostics = exists_or_init(diagnostics)
+    vim.tbl_map(function (d)
+      create_diagnostic_extmark(d.bufnr, namespace, d)
+    end, get_missing_diag(diagnostics, marks))
   end
 
-  for d_handler, enable in pairs(decorations) do
-    diag.handlers[d_handler] = enable and create_handler(d_handler) or d_handlers[d_handler]
+  local show = function(_, bufnr, diagnostics, _)
+    if not diagnostics or vim.tbl_isempty(diagnostics) then return end
+
+    local marks = vim.api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {})
+    diagnostics = filter_unused(diagnostics or {}, true)
+    -- remove outdated marks
+    for index, mark in ipairs(marks) do
+      if not mark_has_diagnostic(diagnostics, mark) then
+        marks[index] = nil
+        vim.api.nvim_buf_del_extmark(bufnr, namespace, mark[1])
+      end
+    end
+    add_new_marks(diagnostics, marks)
   end
+  -- dont need a hide function
+  return { show = show }
 end
 
 dim.setup = function(params)
@@ -143,33 +153,8 @@ dim.setup = function(params)
     vim.api.nvim_set_hl(0, "Unused", params.hl)
     dim.hl = "Unused"
   end
-  local timer_debounce = params and params.timer_debounce or 200
-  timer_debounce = timer_debounce < 0 and 0 or timer_debounce
-  dim.timer = vim.loop.new_timer()
-  dim.marks = {}
-  dim.diagnostics= {}
-  vim.diagnostic.handlers["dim/unused"] = {
-    show = function(_, bufnr, diagnostics, _)
-      dim.marks[bufnr] = dim.marks[bufnr] or {}
-      dim.marks[bufnr] = vim.api.nvim_buf_get_extmarks(bufnr, dim.ns, 0, -1, {})
-      local filtered = dim.detect_unused(diagnostics)
-      dim.diagnostics[bufnr] = dim.diagnostics[bufnr] or {}
-      dim.diagnostics[bufnr]['current'] = dim.diagnostics[bufnr]['current'] or {}
-      dim.diagnostics[bufnr]['prev'] = dim.diagnostics[bufnr]['current']
-      dim.diagnostics[bufnr]['current'] = filtered
-      vim.schedule(function() update(bufnr, dim.diagnostics[bufnr]['current'], dim.marks[bufnr]) end)
-    end,
-    hide = function (_, bufnr)
-      local d_buf = dim.diagnostics[bufnr]
-      if not d_buf or not d_buf.current or not d_buf.prev then return end
-      d_buf.current = vim.tbl_filter(function(t)
-        for _, v in ipairs(d_buf.prev) do
-          return v.lnum ~= t.lnum or v.message:gsub('j','') ~= t.message:gsub('j','')
-        end
-      end, d_buf.current)
-      vim.schedule(function() update(bufnr, d_buf.current, dim.marks[bufnr]) end)
-    end
-  }
+
+  vim.diagnostic.handlers["dim/unused"] = create_dim_handler(dim.ns)
 end
 
 return dim
