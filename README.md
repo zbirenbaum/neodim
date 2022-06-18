@@ -15,6 +15,8 @@ use {
   event = "LspAttach",
   config = function ()
     require("neodim").setup({
+      blend_color = "#000000"
+      alpha = 0.75
       hide = {
         virtual_text = true,
         signs = true,
@@ -27,6 +29,7 @@ use {
 
 ### Options:
 
+#### Decoration Options
 All decorations can be hidden for diagnostics pertaining to unused tokens. By default, hiding all of them is enabled, but you can re-enable them by changing the config table passed to neodim. It is important to note that regardless of what you put in this configuration, neodim will always respect settings created with `vim.diagnostic.config`. For example, if all underline decorations are disabled by running `vim.diagnostic.config({ underline=false })`, neodim will ***not*** re-enable them for "unused" diagnostics.
 
 Example:
@@ -46,6 +49,31 @@ require("neodim").setup({
     signs = false,
     underline = false,
   }
+})
+```
+
+#### Dim Highlight Options
+
+##### blend_color
+
+`blend_color` controls the color which is used to dim your highlight. Black is the default, but you could set this to your terminal or neovim background color to make it more seamless.
+
+Example:
+
+```
+require("neodim").setup({
+  blend_color = "#10171f"
+})
+```
+
+##### alpha
+
+Alpha controls how dim the highlight becomes. A value of 1 means that dimming will do nothing at all, while a value of 0 will make it identical to #000000 or the color set in `blend_color`. Conceptually, if you were to place the text to be dimmed on a background of `blend_color`, and then set the opacity of the text to the value of alpha, you would have the resulting color that the plugin highlights with.
+
+
+```
+require("neodim").setup({
+  alpha = 0.5 -- make the dimmed text even dimmer
 })
 ```
 

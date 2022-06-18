@@ -62,7 +62,7 @@ local blend = function(fg, bg, alpha)
 end
 
 M.darken = function(hex, amount, bg)
-  return blend(hex, bg or "#000000", math.abs(amount))
+  return blend(hex, bg, math.abs(amount))
 end
 
 return M

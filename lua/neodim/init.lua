@@ -2,9 +2,15 @@ local util = require("neodim.util")
 local results = {}
 
 setmetatable(results, { __mode = "v" }) -- make values weak
-local dim = {}
-dim.marks = {}
-dim.hl_map = {}
+local dim = {
+  marks = {},
+  hl_map = {},
+  opts = {
+    blend_color = "#000000",
+    alpha = .75,
+    hide = { underline = true, virtual_text = true, signs = true }
+  }
+}
 
 local exists_or_init = function (t) return t or {} end
 
@@ -17,7 +23,7 @@ end
 dim.get_unused_group = function(ts_group)
   local darkened = function(color)
     if not results[color] then
-      results[color] = util.darken(color, 0.75)
+      results[color] = util.darken(color, dim.opts.alpha, dim.opts.blend_color)
     end
     return results[color]
   end
@@ -158,9 +164,8 @@ dim.create_dim_handler = function (namespace)
 end
 
 dim.setup = function(params)
-  local defaults = { hide = { underline = true, virtual_text = true, signs = true } }
-  params = vim.tbl_deep_extend("force", defaults, params or {})
-  hide_unused_decorations(params.hide)
+  dim.opts = vim.tbl_deep_extend("force", dim.opts, params or {})
+  hide_unused_decorations(dim.opts.hide)
 
   dim.ns = vim.api.nvim_create_namespace("dim")
   vim.diagnostic.handlers["dim/unused"] = dim.create_dim_handler(dim.ns)
