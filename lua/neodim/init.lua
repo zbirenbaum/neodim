@@ -6,8 +6,12 @@ local dim = {
   marks = {},
   hl_map = {},
   opts = {
-    blend_color = "#000000",
     alpha = .75,
+    blend_color = "#000000",
+    update_in_insert = {
+      enable = true,
+      delay = 75,
+    },
     hide = { underline = true, virtual_text = true, signs = true }
   }
 }
@@ -119,7 +123,7 @@ local hide_unused_decorations = function (decorations)
   end
 end
 
-dim.create_dim_handler = function (namespace)
+dim.create_dim_handler = function (namespace, opts)
   local mark_has_diagnostic = function (diagnostics, mark)
     for _, v in ipairs(diagnostics) do
       if v.lnum == mark[2] and math.abs(v.end_col - mark[3]) <= 1 then
@@ -185,10 +189,15 @@ dim.create_dim_handler = function (namespace)
       if is_queued then
         show(_, bufnr, vim.diagnostic.get(bufnr, {}), _)
       end
-    end, 100)
+    end, opts.update_in_insert.delay or 75)
   end
 
-  return { show = show, hide = hide}
+  return {
+    show = show,
+    hide = opts.update_in_insert.enable and hide or function (_, bufnr)
+      refresh(bufnr)
+    end
+  }
 end
 
 dim.setup = function(params)
@@ -196,7 +205,7 @@ dim.setup = function(params)
   hide_unused_decorations(dim.opts.hide)
 
   dim.ns = vim.api.nvim_create_namespace("dim")
-  vim.diagnostic.handlers["dim/unused"] = dim.create_dim_handler(dim.ns)
+  vim.diagnostic.handlers["dim/unused"] = dim.create_dim_handler(dim.ns, dim.opts)
 end
 
 return dim
