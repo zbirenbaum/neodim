@@ -164,39 +164,28 @@ dim.create_dim_handler = function (namespace)
     end
   end
 
-  local update = function (bufnr, diagnostics)
-    if not diagnostics then
-      diagnostics = filter_unused(vim.diagnostic.get(bufnr, {}), true)
-    end
-    local fullmarks = vim.api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {})
-    local keys = vim.tbl_keys(fullmarks)
-    for index, d in ipairs(diagnostics) do
-      if not vim.tbl_isempty(fullmarks) then
-        local move = fullmarks[keys[index]]
-        dim.move_diagnostic_extmark(bufnr, namespace, d, move)
-        fullmarks[keys[index]] = nil
-      else
-        dim.create_diagnostic_extmark(bufnr, namespace, d)
-      end
-    end
-    refresh(bufnr)
-  end
-
   local show = function(_, bufnr, diagnostics, _)
     if vim.in_fast_event() then return end
     diagnostics = filter_unused(diagnostics, true)
-    update(bufnr, diagnostics)
+    refresh(bufnr)
+    for _, d in ipairs(diagnostics) do
+      dim.create_diagnostic_extmark(bufnr, namespace, d)
+    end
   end
 
-  local is_deferred = false
   local hide = function(_, bufnr)
-    if not is_deferred then
-      is_deferred = true
-      vim.defer_fn(function ()
-        update(bufnr)
-        is_deferred = false
-      end, 20)
-    end
+    local is_queued = true
+    vim.api.nvim_create_autocmd({"TextChangedI", "TextChangedP"}, {
+      callback = function ()
+        is_queued = false
+      end,
+      once = true,
+    })
+    vim.defer_fn(function ()
+      if is_queued then
+        show(_, bufnr, vim.diagnostic.get(bufnr, {}), _)
+      end
+    end, 100)
   end
 
   return { show = show, hide = hide}
