@@ -60,6 +60,20 @@ dim.create_diagnostic_extmark = function (bufnr, ns, diagnostic)
   })
 end
 
+dim.move_diagnostic_extmark = function (bufnr, ns, diagnostic, mark)
+  local hl = dim.get_hl(diagnostic)
+  if not hl then return end
+  return vim.api.nvim_buf_set_extmark(bufnr, ns, diagnostic.lnum, diagnostic.col, {
+    id = mark.id,
+    end_line = diagnostic.lnum,
+    end_col = diagnostic.end_col,
+    hl_group = hl,
+    priority = 200,
+    end_right_gravity = true,
+    strict = false,
+  })
+end
+
 local is_unused = function(diagnostic)
   local diag_info = diagnostic.tags or vim.tbl_get(diagnostic, "user_data", "lsp", "tags") or diagnostic.code
   if type(diag_info) == "table" then
@@ -139,27 +153,52 @@ dim.create_dim_handler = function (namespace)
   end
 
   local refresh = function (bufnr)
-    for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, namespace, 0, -1, {})
-) do
-      local d_lnum = filter_unused(vim.diagnostic.get(bufnr, {lnum=m[2]}), true)
-      local m_lnum = vim.api.nvim_buf_get_extmarks(bufnr, namespace, {m[2],0}, {m[2]+1,0}, {})
-      if #d_lnum ~= #m_lnum then
-        vim.api.nvim_buf_clear_namespace(bufnr, namespace, m[2], m[2]+1)
+    for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, namespace, 0, -1, {})) do
+      local diagnostics = filter_unused(vim.diagnostic.get(bufnr, {
+        lnum = m[2]
+      }), true)
+      vim.api.nvim_buf_clear_namespace(bufnr, namespace, m[2], m[2]+1)
+      for _, d in ipairs(diagnostics) do
+        dim.create_diagnostic_extmark(bufnr, namespace, d)
       end
     end
-    local marks = vim.api.nvim_buf_get_extmarks(0, namespace, 0, -1, {})
+  end
+
+  local update = function (bufnr, diagnostics)
+    if not diagnostics then
+      diagnostics = filter_unused(vim.diagnostic.get(bufnr, {}), true)
+    end
+    local fullmarks = vim.api.nvim_buf_get_extmarks(bufnr, namespace, 0, -1, {})
+    local keys = vim.tbl_keys(fullmarks)
+    for index, d in ipairs(diagnostics) do
+      if not vim.tbl_isempty(fullmarks) then
+        local move = fullmarks[keys[index]]
+        dim.move_diagnostic_extmark(bufnr, namespace, d, move)
+        fullmarks[keys[index]] = nil
+      else
+        dim.create_diagnostic_extmark(bufnr, namespace, d)
+      end
+    end
+    refresh(bufnr)
   end
 
   local show = function(_, bufnr, diagnostics, _)
-    local marks = refresh(bufnr)
-    diagnostics = filter_unused(vim.diagnostic.get(bufnr, {}), true)
-    add_new_marks(diagnostics, marks)
+    if vim.in_fast_event() then return end
+    diagnostics = filter_unused(diagnostics, true)
+    update(bufnr, diagnostics)
   end
 
-  local hide = function(_, bufnr, diagnostics, _)
-    refresh(bufnr)
+  local is_deferred = false
+  local hide = function(_, bufnr)
+    if not is_deferred then
+      is_deferred = true
+      vim.defer_fn(function ()
+        update(bufnr)
+        is_deferred = false
+      end, 20)
+    end
   end
-  -- dont need a hide function
+
   return { show = show, hide = hide}
 end
 
