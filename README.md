@@ -13,8 +13,8 @@ use {
   event = "LspAttach",
   config = function ()
     require("neodim").setup({
-      alpha = 0.75
-      blend_color = "#000000"
+      alpha = 0.75,
+      blend_color = "#000000",
       update_in_insert = {
         enable = true,
         delay = 100,
