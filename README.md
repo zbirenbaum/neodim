@@ -7,7 +7,7 @@ This plugin takes heavy inspiration from https://github.com/NarutoXY/dim.lua. Th
 
 Install the plugin like any other:
 
-```
+```lua
 use {
   "zbirenbaum/neodim",
   event = "LspAttach",
@@ -38,7 +38,7 @@ use {
 Alpha controls how dim the highlight becomes. A value of 1 means that dimming will do nothing at all, while a value of 0 will make it identical to #000000 or the color set in `blend_color`. Conceptually, if you were to place the text to be dimmed on a background of `blend_color`, and then set the opacity of the text to the value of alpha, you would have the resulting color that the plugin highlights with.
 
 
-```
+```lua
 require("neodim").setup({
   alpha = 0.5 -- make the dimmed text even dimmer
 })
@@ -50,7 +50,7 @@ require("neodim").setup({
 
 Example:
 
-```
+```lua
 require("neodim").setup({
   blend_color = "#10171f"
 })
@@ -62,7 +62,7 @@ require("neodim").setup({
 Update in insert mode from the diagnostic config causes all diagnostic handlers to update in insert mode, causing visual flashes and is a general annoyance fairly often. However, the update_in_insert feature implemented in neodim functions very differently. neodim will be the only diagnostic handler to update in insert mode. Additionally, this functionality was implemented via the hide callback, which is triggered while typing by the diagnostics automatically, and rather than call a function with a TextChanged autocmd, it cancels one instead. Thus, only after you have not typed for a very short amount of time will things refresh, greatly reducing visual flashing but allowing updates without going into normal mode. The delay field allows you to customize how long this period is, but be warned that lower delays will lead to higher cpu usage.
 
 Example:
-```
+```lua
 require("neodim").setup({
   update_in_insert = {
     enable = false, -- disable updates in insert mode
@@ -70,7 +70,7 @@ require("neodim").setup({
 })
 ```
 
-```
+```lua
 require("neodim").setup({
   update_in_insert = {
     delay = 200, -- increase the delay for updates to 200ms between insertions
@@ -83,14 +83,14 @@ All decorations can be hidden for diagnostics pertaining to unused tokens. By de
 
 Example:
 
-```
+```lua
 -- re-enable only sign decorations for 'unused' diagnostics
 require("neodim").setup({
   hide = {signs = false }
 })
 ```
 
-```
+```lua
 -- renable all decorations for 'unused' diagnostics
 require("neodim").setup({
   hide = {
