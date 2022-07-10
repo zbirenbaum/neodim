@@ -187,7 +187,9 @@ dim.create_dim_handler = function (namespace, opts)
     })
     vim.defer_fn(function ()
       if is_queued then
-        show(_, bufnr, vim.diagnostic.get(bufnr, {}), _)
+        vim.schedule(function ()
+          show(_, bufnr, vim.diagnostic.get(bufnr, {}), _)
+        end)
       end
     end, opts.update_in_insert.delay or 75)
   end
