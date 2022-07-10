@@ -179,14 +179,16 @@ dim.create_dim_handler = function (namespace, opts)
 
   local hide = function(_, bufnr)
     local is_queued = true
+
     vim.api.nvim_create_autocmd({"TextChangedI", "TextChangedP"}, {
       callback = function ()
         is_queued = false
       end,
       once = true,
     })
+
     vim.defer_fn(function ()
-      if is_queued then
+      if is_queued and vim.api.nvim_buf_is_valid(bufnr) then
         show(_, bufnr, vim.diagnostic.get(bufnr, {}), _)
       end
     end, opts.update_in_insert.delay or 75)
