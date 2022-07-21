@@ -171,9 +171,9 @@ dim.create_dim_handler = function (namespace, opts)
   local show = function(_, bufnr, diagnostics, _)
     if vim.in_fast_event() then return end
     diagnostics = filter_unused(diagnostics, true)
-    refresh(bufnr)
+    pcall(refresh, bufnr)
     for _, d in ipairs(diagnostics) do
-      dim.create_diagnostic_extmark(bufnr, namespace, d)
+      pcall(dim.create_diagnostic_extmark, bufnr, namespace, d)
     end
   end
 
