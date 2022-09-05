@@ -4,6 +4,19 @@ local ts_utils = require "nvim-treesitter.ts_utils"
 local highlighter = require "vim.treesitter.highlighter"
 
 M.get_treesitter_nodes = function(buf, row, col, end_col)
+  if vim.treesitter.get_captures_at_position ~= nil then
+    local nodes = vim.treesitter.get_captures_at_position(buf, row, col)
+    local matches = vim.tbl_map(function(match)
+      return match.capture
+    end, nodes)
+
+    if #matches == 0 then
+      return
+    end
+
+    return matches[#matches]
+  end
+
   local self = highlighter.active[buf]
   if not self then
     return {}
