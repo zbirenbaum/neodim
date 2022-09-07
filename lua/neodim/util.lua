@@ -3,13 +3,38 @@ local M = {}
 local ts_utils = require "nvim-treesitter.ts_utils"
 local highlighter = require "vim.treesitter.highlighter"
 
-M.get_treesitter_nodes = function(buf, row, col, end_col)
-  local self = highlighter.active[buf]
-  if not self then
+local to_hl_group = function (inputstr, sep)
+  if not inputstr then return end
+  sep = sep or '%.'
+  local t = {}
+  for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+    table.insert(t, str:sub(1, 1):upper() .. str:sub(2))
+  end
+  return 'TS' .. table.concat(t)
+end
+
+M.get_treesitter_nodes = function(bufnr, row, col)
+  if vim.treesitter.get_captures_at_position ~= nil then
+    local nodes = vim.treesitter.get_captures_at_position(bufnr, row, col)
+    local matches = vim.tbl_map(function(match)
+      return match.capture
+    end, nodes)
+
+    if #matches == 0 then
+      return
+    end
+
+    local hl_group = to_hl_group(matches[#matches])
+
+    return hl_group
+  end
+
+  local buf_highlighter = highlighter.active[bufnr]
+  if not buf_highlighter then
     return {}
   end
   local matches = {}
-  self.tree:for_each_tree(function(tstree, tree)
+  buf_highlighter.tree:for_each_tree(function(tstree, tree)
     if not tstree then
       return
     end
@@ -18,11 +43,11 @@ M.get_treesitter_nodes = function(buf, row, col, end_col)
     if root_start_row > row or root_end_row < row then
       return
     end
-    local query = self:get_query(tree:lang())
+    local query = buf_highlighter:get_query(tree:lang())
     if not query:query() then
       return
     end
-    local iter = query:query():iter_captures(root, self.bufnr, row, row + 1)
+    local iter = query:query():iter_captures(root, buf_highlighter.bufnr, row, row + 1)
     for capture, node, _ in iter do
       local hl = query.hl_cache[capture]
       if hl and ts_utils.is_in_node_range(node, row, col) then

@@ -19,7 +19,7 @@ local dim = {
 local exists_or_init = function (t) return t or {} end
 
 local function get_ts_group(bufnr, lnum, col, end_col)
-  local ts_group = util.get_treesitter_nodes(bufnr, lnum, col, end_col)
+  local ts_group = util.get_treesitter_nodes(bufnr, lnum, col)
   ts_group = type(ts_group) == "string" and ts_group or nil
   return ts_group
 end
