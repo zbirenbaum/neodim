@@ -14,8 +14,9 @@ local to_hl_group = function (inputstr, sep)
 end
 
 M.get_treesitter_nodes = function(bufnr, row, col)
-  if vim.treesitter.get_captures_at_position ~= nil then
-    local nodes = vim.treesitter.get_captures_at_position(bufnr, row, col)
+  local capture_fn = vim.treesitter.get_captures_at_pos or vim.treesitter.get_captures_at_position
+  if capture_fn ~= nil then
+    local nodes = capture_fn(bufnr, row, col)
     local matches = vim.tbl_map(function(match)
       return match.capture
     end, nodes)
@@ -27,44 +28,43 @@ M.get_treesitter_nodes = function(bufnr, row, col)
     local hl_group = to_hl_group(matches[#matches])
 
     return hl_group
-  end
-
-  local buf_highlighter = highlighter.active[bufnr]
-  if not buf_highlighter then
-    return {}
-  end
-  local matches = {}
-  buf_highlighter.tree:for_each_tree(function(tstree, tree)
-    if not tstree then
-      return
-    end
-    local root = tstree:root()
-    local root_start_row, _, root_end_row, _ = root:range()
-    if root_start_row > row or root_end_row < row then
-      return
-    end
-    local query = buf_highlighter:get_query(tree:lang())
-    if not query:query() then
-      return
-    end
-    local iter = query:query():iter_captures(root, buf_highlighter.bufnr, row, row + 1)
-    for capture, node, _ in iter do
-      local hl = query.hl_cache[capture]
-      if hl and ts_utils.is_in_node_range(node, row, col) then
-        local c = query._query.captures[capture]
-        if c ~= nil then
-          local general_hl = query:_get_hl_from_capture(capture)
-          table.insert(matches, { ts_group = general_hl, node = node })
+  else
+  -- fallback for older neovim versions
+    local buf_highlighter = highlighter.active[bufnr]
+    if not buf_highlighter then return {} end
+    local matches = {}
+    buf_highlighter.tree:for_each_tree(function(tstree, tree)
+      if not tstree then
+        return
+      end
+      local root = tstree:root()
+      local root_start_row, _, root_end_row, _ = root:range()
+      if root_start_row > row or root_end_row < row then
+        return
+      end
+      local query = buf_highlighter:get_query(tree:lang())
+      if not query:query() then
+        return
+      end
+      local iter = query:query():iter_captures(root, buf_highlighter.bufnr, row, row + 1)
+      for capture, node, _ in iter do
+        local hl = query.hl_cache[capture]
+        if hl and ts_utils.is_in_node_range(node, row, col) then
+          local c = query._query.captures[capture]
+          if c ~= nil then
+            local general_hl = query:_get_hl_from_capture(capture)
+            table.insert(matches, { ts_group = general_hl, node = node })
+          end
         end
       end
+    end, true)
+    local final = #matches >= 1 and matches[#matches] or nil
+    if not final then
+      return
     end
-  end, true)
-  local final = #matches >= 1 and matches[#matches] or nil
-  if not final then
-    return
+    local unused_group = final.ts_group
+    return unused_group
   end
-  local unused_group = final.ts_group
-  return unused_group
 end
 
 local hex_to_rgb = function(hex_str)
