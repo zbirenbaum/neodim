@@ -25,7 +25,7 @@ M.get_treesitter_nodes = function(bufnr, row, col)
       return
     end
 
-    local hl_group = to_hl_group(matches[#matches])
+    local hl_group = vim.fn.has("nvim-0.8.0") and "@"..matches[#matches] or to_hl_group(matches[#matches])
 
     return hl_group
   else
