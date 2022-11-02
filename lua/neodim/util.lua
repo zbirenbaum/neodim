@@ -13,6 +13,14 @@ local to_hl_group = function (inputstr, sep)
   return 'TS' .. table.concat(t)
 end
 
+local to_ts_hl_group = function (str)
+  local still_old, _ = pcall(vim.api.nvim_get_hl_by_name, "TSWarning", true);
+  if still_old then
+    return nil
+  end
+  return "@"..str
+end
+
 M.get_treesitter_nodes = function(bufnr, row, col)
   local capture_fn = vim.treesitter.get_captures_at_pos or vim.treesitter.get_captures_at_position
   if capture_fn ~= nil then
@@ -25,7 +33,7 @@ M.get_treesitter_nodes = function(bufnr, row, col)
       return
     end
 
-    local hl_group = to_hl_group(matches[#matches])
+    local hl_group = to_ts_hl_group(matches[#matches]) or to_hl_group(matches[#matches])
 
     return hl_group
   else
