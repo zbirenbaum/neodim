@@ -14,9 +14,9 @@ local to_hl_group = function (inputstr, sep)
 end
 
 local to_ts_hl_group = function (str)
-  local still_old, _ = pcall(vim.api.nvim_get_hl_by_name, "TSWarning", true);
-  if still_old then
-    return nil
+  local is_updated, _ = pcall(vim.api.nvim_get_hl_by_name, "@warning", true);
+  if not is_updated then
+    return
   end
   return "@"..str
 end
