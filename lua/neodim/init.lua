@@ -5,7 +5,7 @@ local handlers = require('neodim.handlers')
 
 dim.setup = function (params)
   config.init()
-  handlers.init(config.get())
+  -- handlers.init(config.get())
 end
 
 return dim

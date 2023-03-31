@@ -6,6 +6,7 @@ local hl_map = {}
 
 setmetatable(hl_map, { __mode = "v" }) -- make values weak
 
+
 local getDimHighlight = function (ns, hl_group)
   local group =  string.format('%sUnused', hl_group)
 
@@ -72,10 +73,9 @@ M.highlightDiagnostic = function (bufnr, ns, diagnostic)
   -- end
 end
 
-M.init = function (config)
-  opts = config
-  vim.api.nvim_set_hl_ns(opts.ns)
-  return M
-end
+-- M.init = function (config)
+--   opts = config or {}
+--   return M
+-- end
 
 return M

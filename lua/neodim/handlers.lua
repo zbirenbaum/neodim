@@ -22,13 +22,16 @@ end
 local createDimHandlers = function (opts)
   local highlighter = opts.highligher
   local update_in_insert = opts.update_in_insert
+  local ns = opts.ns
 
   local refresh = function (bufnr)
-    for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, opts.ns, 0, -1, {})) do
-      local diagnostics = vim.diagnostic.get(bufnr, { lnum = m[2] })
-      diagnostics = filter.getUsed(diagnostics)
-      for _, diagnostic in ipairs(diagnostics) do
-        vim.api.nvim_buf_clear_namespace(bufnr, opts.ns, m[2], m[2]+1)
+    for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, {})) do
+      local diagnostics = filter.getUnused(vim.diagnostic.get(bufnr, {
+        lnum = m[2]
+      }))
+      vim.api.nvim_buf_clear_namespace(bufnr, ns, m[2], m[2]+1)
+      for _, d in ipairs(diagnostics) do
+        highlighter.highlightDiagnostic(bufnr, ns, d)
       end
     end
   end
@@ -37,7 +40,7 @@ local createDimHandlers = function (opts)
     if vim.in_fast_event() then return end
     diagnostics = filter.getUnused(diagnostics)
     for _, d in ipairs(diagnostics) do
-      pcall(highlighter.highlightDiagnostic, bufnr, opts.ns, d)
+      pcall(highlighter.highlightDiagnostic, bufnr, ns, d)
     end
     refresh(bufnr)
   end

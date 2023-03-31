@@ -1,7 +1,73 @@
 local M = {}
-
 local ts_utils = require "nvim-treesitter.ts_utils"
 local highlighter = require "vim.treesitter.highlighter"
+
+-- Refactor:
+-- First find the ranges which need to be dimmed from diagnostics
+-- find all the nodes in those ranges
+-- highlight those nodes with the dimmed color
+
+local compareBoundary = function (node, row, col)
+  print(node:end_())
+  print(node:type())
+  local nrow, ncol, _ node:end_()
+  return row == nrow and col >= ncol-1
+end
+
+local getChildrenInBoundary = function (node, row, col)
+  local matches = {}
+  node = node:child()
+  while(node and compareBoundary(node, row, col)) do
+    matches[#matches+1] = node
+    node = node:child()
+  end
+  return matches
+end
+
+local getNodesInBoundary = function (node, row, col)
+  local matches = {}
+  while node and compareBoundary(node, row, col) do
+    matches[#matches+1] = node
+    for _, child in ipairs(getChildrenInBoundary(node, row, col)) do
+      matches[#matches+1] = child
+    end
+    node = node:next_named_sibling()
+  end
+  return matches
+end
+
+M.matches = function ()
+  for pattern, match, metadata in cquery:iter_matches(tree:root(), bufnr, first, last) do
+    for id, node in pairs(match) do
+      local name = query.captures[id]
+      -- `node` was captured by the `name` capture in the match
+      local node_data = metadata[id] -- Node level metadata
+      -- ... use the info here ...
+    end
+  end
+end
+M.getNodesInRange = function (bufnr, range)
+  local node = vim.treesitter.get_node({bufnr = bufnr, row = range.startrow, col = range.startcol})
+  if not node then return {} end
+  return getNodesInBoundary(node, range.endrow, range.endcol)
+  -- while(not x) do
+  --   local nchildren = node:child_count()
+  --   local lastchild = node:child(nchildren)
+  --   if not vim.treesitter.is_in_node_range(lastchild, row, col) then
+  --   while(nchildren > 0) do
+  --     table.insert(matches, child)
+  --     if vim.treesitter.is_in_node_range(child, row, col) then
+  --       node = child
+  --       break
+  --     end
+  --     nchildren = nchildren - 1
+  --     node = node:child()
+  --   end
+  --   table.insert(matches, node)
+  --   print(vim.inspect(node))
+  -- end
+  -- table.insert(matches, node)
+end
 
 local to_hl_group = function (inputstr, sep)
   if not inputstr then return end
