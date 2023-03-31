@@ -29,7 +29,6 @@ colors.blend = function(fg, bg, alpha)
     return math.floor(math.min(math.max(0, ret), 255) + 0.5)
   end
   local res = string.format("#%02X%02X%02X", blendChannel(1), blendChannel(2), blendChannel(3))
-  print(res)
   return res
 end
 

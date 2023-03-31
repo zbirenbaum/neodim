@@ -14,7 +14,7 @@ local to_hl_group = function (inputstr, sep)
 end
 
 local to_ts_hl_group = function (str)
-  local is_updated, _ = pcall(vim.api.nvim_get_hl_by_name, "@warning", true);
+  local is_updated, _ = pcall(vim.api.nvim_get_hl, 0, {name="@warning"});
   if not is_updated then
     return
   end
@@ -22,7 +22,7 @@ local to_ts_hl_group = function (str)
 end
 
 M.get_treesitter_nodes = function(bufnr, row, col)
-  local capture_fn = vim.treesitter.get_captures_at_pos or vim.treesitter.get_captures_at_position
+  local capture_fn = vim.treesitter.get_captures_at_pos
   if capture_fn ~= nil then
     local nodes = capture_fn(bufnr, row, col)
     local matches = vim.tbl_map(function(match)

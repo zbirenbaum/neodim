@@ -1,10 +1,11 @@
 local dim = {}
 
+local config = require("neodim.config")
+local handlers = require('neodim.handlers')
+
 dim.setup = function (params)
-  local config = require("neodim.opts").init(params)
-  config.colors = require("neodim.colors")
-  local highlights = require("neodim.highlights").init(config)
-  local handlers = require('neodim.handlers').init(config, highlights)
+  config.init()
+  handlers.init(config.get())
 end
 
 return dim

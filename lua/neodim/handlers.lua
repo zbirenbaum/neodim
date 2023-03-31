@@ -1,6 +1,4 @@
 local handlers = {}
-
-local highlight
 local filter = require("neodim.filter")
 
 local create_handler = function (old_handler)
@@ -21,14 +19,16 @@ local hideUnusedDecorations = function (decorations)
   end
 end
 
-local createDimHandlers = function ()
+local createDimHandlers = function (opts)
+  local highlighter = opts.highligher
+  local update_in_insert = opts.update_in_insert
+
   local refresh = function (bufnr)
-    for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, handlers.ns, 0, -1, {})) do
+    for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, opts.ns, 0, -1, {})) do
       local diagnostics = vim.diagnostic.get(bufnr, { lnum = m[2] })
-      diagnostics = filter.getUnused(diagnostics)
-      vim.api.nvim_buf_clear_namespace(bufnr, handlers.ns, m[2], m[2]+1)
-      for _, d in ipairs(diagnostics) do
-        highlight.create_diagnostic_extmark(bufnr, handlers.ns, d)
+      diagnostics = filter.getUsed(diagnostics)
+      for _, diagnostic in ipairs(diagnostics) do
+        vim.api.nvim_buf_clear_namespace(bufnr, opts.ns, m[2], m[2]+1)
       end
     end
   end
@@ -36,15 +36,15 @@ local createDimHandlers = function ()
   local show = function(_, bufnr, diagnostics, _)
     if vim.in_fast_event() then return end
     diagnostics = filter.getUnused(diagnostics)
-    pcall(refresh, bufnr)
     for _, d in ipairs(diagnostics) do
-      pcall(highlight.create_diagnostic_extmark, bufnr, handlers.ns, d)
+      pcall(highlighter.highlightDiagnostic, bufnr, opts.ns, d)
     end
+    refresh(bufnr)
   end
+
 
   local hide = function(_, bufnr)
     local is_queued = true
-
     vim.api.nvim_create_autocmd({"TextChangedI", "TextChangedP"}, {
       callback = function ()
         is_queued = false
@@ -56,27 +56,25 @@ local createDimHandlers = function ()
       if is_queued and vim.api.nvim_buf_is_valid(bufnr) then
         show(_, bufnr, vim.diagnostic.get(bufnr, {}), _)
       end
-    end, handlers.update_in_insert.delay or 75)
+    end, update_in_insert.delay or 75)
   end
 
   return {
     show = show,
-    hide = handlers.update_in_insert.enable and hide or function (_, bufnr)
-      refresh(bufnr)
+    hide = update_in_insert.enable and hide or function ()
+      refresh(0)
     end
   }
 end
 
-handlers.setNamespace = function (name)
-  handlers.ns = vim.api.nvim_create_namespace(name or 'dim')
-end
-
 handlers.init = function (opts)
-  -- handlers.opts = vim.tbl_extend("force", default_opts, opts or {})
   hideUnusedDecorations(opts.hide)
-  handlers.opts.blend_color = handlers.opts.blend_color:gsub('#', '')
-  handlers.setNamespace(opts.namespace)
-  vim.diagnostic.handlers["dim/unused"] = createDimHandlers()
+  vim.api.nvim_set_hl_ns(opts.ns)
+  vim.diagnostic.handlers["dim/unused"] = createDimHandlers({
+    highligher = require('neodim.highlights').init(opts),
+    update_in_insert = opts.update_in_insert,
+    ns = opts.ns,
+  })
   return handlers
 end
 

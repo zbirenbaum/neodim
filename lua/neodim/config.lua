@@ -1,7 +1,9 @@
 local config = {
   opts = {
-    update_in_insert = true,
-    delay = 75,
+    update_in_insert = {
+      enable = true,
+      delay = 75,
+    },
     alpha = .75,
     blend_color = "000000",
     hide = { underline = true, virtual_text = true, signs = true },
