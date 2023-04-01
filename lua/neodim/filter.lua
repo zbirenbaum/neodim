@@ -23,7 +23,10 @@ filter.used = function (diagnostic, isused)
   local checkTags = hasUnusedTags(diagnostic.tags) or hasUnusedTags(userData.tags)
   local checkMsg = unusedInString(diagnostic.msg) or unusedInString(userData.code)
   local unused = checkTags or checkMsg
-  return (isused and not unused) or not (isused and unused)
+  if isused then
+    return not unused
+  end
+  return unused
 end
 
 filter.getUnused = function (diagnostics)
