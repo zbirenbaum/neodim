@@ -17,10 +17,6 @@ colors.rgb_to_hex = function (rgb)
   return string.format("#%s", val)
 end
 
-colors.format_rgb = function (value)
-  return colors.hex_to_rgb()
-end
-
 colors.blend = function(fg, bg, alpha)
   fg = colors.hex_to_rgb(fg)
   bg = colors.hex_to_rgb(bg)

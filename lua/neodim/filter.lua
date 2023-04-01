@@ -12,7 +12,9 @@ local hasUnusedTags = function (tags)
   return tags and vim.tbl_contains(tags, target)
 end
 
-local isUnused = function (diagnostic)
+--- @param diagnostic table
+--  @param isused boolean
+filter.used = function (diagnostic, isused)
   local userData = vim.tbl_get(
     diagnostic,
     "user_data",
@@ -20,30 +22,20 @@ local isUnused = function (diagnostic)
   ) or {}
   local checkTags = hasUnusedTags(diagnostic.tags) or hasUnusedTags(userData.tags)
   local checkMsg = unusedInString(diagnostic.msg) or unusedInString(userData.code)
-  return checkTags or checkMsg
-end
-
-local isUsed = function (diagnostic)
-  return not isUnused(diagnostic)
-end
-
--- takes a function that returns a boolean
-local excludeMatching = function (fn, tbl)
-  if vim.tbl_islist(tbl) then
-    return vim.tbl_filter(function(d)
-      return not fn(d)
-    end, tbl)
-  end
-  return not fn(tbl) and tbl or nil
-end
-
-
-filter.getUsed = function (diagnostics)
-  return excludeMatching(isUnused, diagnostics) or {}
+  local unused = checkTags or checkMsg
+  return (isused and not unused) or not (isused and unused)
 end
 
 filter.getUnused = function (diagnostics)
-  return excludeMatching(isUsed, diagnostics) or {}
+  return vim.tbl_filter(function (d)
+    return filter.used(d, false)
+  end, diagnostics)
+end
+
+filter.getUsed = function (diagnostics)
+  return vim.tbl_filter(function (d)
+    return filter.used(d, true)
+  end, diagnostics)
 end
 
 return filter

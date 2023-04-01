@@ -1,11 +1,15 @@
 local M = {}
-local opts = {}
 local colors = require('neodim.colors')
+local ts = vim.treesitter
+local parsers = require "nvim-treesitter.parsers"
+local opts = {
+  blend_color = '000000',
+  alpha = 0.75,
+}
 
 local hl_map = {}
 
 setmetatable(hl_map, { __mode = "v" }) -- make values weak
-
 
 local getDimHighlight = function (ns, hl_group)
   local group =  string.format('%sUnused', hl_group)
@@ -30,52 +34,89 @@ local getDimHighlight = function (ns, hl_group)
   return group
 end
 
--- create a cache for defined hlgroups
-
-
-M.highlightDiagnostic = function (bufnr, ns, diagnostic)
-  local createExtmark = function (hl_group)
-    local priority = vim.highlight.priorities.treesitter + 1000
-    return vim.api.nvim_buf_set_extmark(bufnr, ns, diagnostic.lnum, diagnostic.col, {
-      end_line = diagnostic.lnum,
-      end_col = diagnostic.end_col,
-      hl_group = hl_group,
-      priority = priority,
-      end_right_gravity = true,
-      strict = false
-    })
-  end
-
-  local data = vim.inspect_pos(
-    diagnostic.bufnr,
-    diagnostic.row,
-    diagnostic.col
-  )
-  local treesitter = data.treesitter
-
-  for _, token in ipairs(treesitter) do
-    local ts_group = string.format('@%s', token.capture)
-    local hl_group = getDimHighlight(ns, ts_group)
-    createExtmark(hl_group)
-  end
-
-  -- local semantic = data.semantic_tokens and data.semantic_tokens.hl_groups
-  -- for _, token in ipairs(semantic) do
-  --   local hl = semanticHighlighter(token.hl_groups)
-  --   vim.api.nvim_buf_set_extmark(bufnr, ns, diagnostic.lnum, diagnostic.col, {
-  --     end_line = diagnostic.lnum,
-  --     end_col = diagnostic.end_col,
-  --     hl_group = hl .. 'Unused',
-  --     priority = vim.highlight.priorities.semantic_tokens,
-  --     end_right_gravity = true,
-  --     strict = false
-  --   })
-  -- end
+local createExtmark = function (bufnr, ns, hl_group, range)
+  local priority = vim.highlight.priorities.treesitter + 1000
+  hl_group = getDimHighlight(ns, hl_group)
+  return vim.api.nvim_buf_set_extmark(bufnr, ns, range.lnum, range.col, {
+    end_line = range.lnum,
+    end_col = range.end_col,
+    hl_group = hl_group,
+    priority = priority,
+    end_right_gravity = true,
+    strict = false
+  })
 end
 
--- M.init = function (config)
---   opts = config or {}
---   return M
--- end
+local function get_node_for_range(bufnr, range)
+  local root_lang_tree = parsers.get_parser(bufnr)
+  if not root_lang_tree then
+    return
+  end
+
+  local root ---@type TSNode|nil
+  for _, tree in ipairs(root_lang_tree:trees()) do
+    local tree_root = tree:root()
+    if tree_root and ts.is_in_node_range(tree_root, range[1], range[2]) then
+      root = tree_root
+      break
+    end
+  end
+
+  -- local root = ts_util.get_root_for_position(range[1], range[2], root_lang_tree)
+  if not root then
+    return
+  end
+  return root:named_descendant_for_range(range[1], range[2], range[3], range[4])
+end
+
+--- @param diagnostic table
+local getDiagnosticNodes = function (diagnostic)
+  local compareBoundary = function (node, row, col)
+    if not node then return end
+    local nrow, ncol = node:end_()
+    return row <= nrow and ncol <= col
+  end
+
+  local getChildrenInBoundary = function (node, row, col)
+    local matches = {}
+    while(node and compareBoundary(node, row, col)) do
+      matches[#matches+1] = node
+      node = node:child()
+    end
+    return matches
+  end
+
+  local d = diagnostic
+  local range = { d.lnum, d.col, d.end_lnum, d.end_col }
+  local root = get_node_for_range(d.bufnr, range)
+  local children = getChildrenInBoundary(root, d.end_lnum, d.end_col)
+  return children
+end
+
+M.highlightDiagnostic = function (ns, diagnostic)
+  local d = diagnostic
+  local children = getDiagnosticNodes(d)
+  for _, child in ipairs(children) do
+    local row, col, end_row, end_col = child:range()
+    local info = vim.inspect_pos(d.bufnr, row, col, {
+      treesitter = true
+    })
+    for _, text in ipairs(info.treesitter) do
+      local hl_group = text.hl_group_link or text.hl_group
+      local node_range = {
+        lnum = row,
+        col = col,
+        end_lnum = end_row,
+        end_col = end_col
+      }
+      createExtmark(d.bufnr, ns, hl_group, node_range)
+    end
+  end
+end
+
+M.init = function (params)
+  opts = vim.tbl_extend('force', opts, params or {})
+  return M
+end
 
 return M
