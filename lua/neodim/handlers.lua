@@ -1,5 +1,6 @@
 local handlers = {}
 local filter = require("neodim.filter")
+local highlighter = require('neodim.highlights')
 
 local create_handler = function (old_handler)
   return {
@@ -20,9 +21,13 @@ local hideUnusedDecorations = function (decorations)
 end
 
 local createDimHandlers = function (opts)
-  local highlighter = opts.highlighter
   local update_in_insert = opts.update_in_insert
   local ns = opts.ns
+  local hl_opts = {
+    blend_color = opts.blend_color,
+    alpha = opts.alpha,
+    ns = opts.ns
+  }
 
   local refresh = function (bufnr)
     for _, m in ipairs(vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, {})) do
@@ -31,7 +36,7 @@ local createDimHandlers = function (opts)
       }))
       vim.api.nvim_buf_clear_namespace(bufnr, ns, m[2], m[2]+1)
       for _, d in ipairs(diagnostics) do
-        highlighter.highlightDiagnostic(ns, d)
+        highlighter.highlightDiagnostic(d, hl_opts)
       end
     end
   end
@@ -40,7 +45,7 @@ local createDimHandlers = function (opts)
     if vim.in_fast_event() then return end
     diagnostics = filter.getUnused(diagnostics)
     for _, d in ipairs(diagnostics) do
-      highlighter.highlightDiagnostic(ns, d)
+      highlighter.highlightDiagnostic(d, hl_opts)
     end
     refresh(bufnr)
   end
@@ -72,11 +77,7 @@ end
 
 handlers.init = function (opts)
   hideUnusedDecorations(opts.hide)
-  vim.diagnostic.handlers["dim/unused"] = createDimHandlers({
-    highlighter = require('neodim.highlights'),
-    update_in_insert = opts.update_in_insert,
-    ns = opts.ns,
-  })
+  vim.diagnostic.handlers["dim/unused"] = createDimHandlers(opts)
   return handlers
 end
 

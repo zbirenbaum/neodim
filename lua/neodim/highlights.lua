@@ -2,16 +2,12 @@ local M = {}
 local colors = require('neodim.colors')
 local ts = vim.treesitter
 local parsers = require "nvim-treesitter.parsers"
-local opts = {
-  blend_color = '000000',
-  alpha = 0.75,
-}
 
 local hl_map = {}
 
 setmetatable(hl_map, { __mode = "v" }) -- make values weak
 
-local getDimHighlight = function (ns, hl_group)
+local getDimHighlight = function (hl_group, opts)
   local group =  string.format('%sUnused', hl_group)
 
   if hl_map[group] then
@@ -25,7 +21,7 @@ local getDimHighlight = function (ns, hl_group)
   local bg = colors.rgb_to_hex(tonumber(opts.blend_color, 16))
   local color = colors.blend(fg, bg, opts.alpha)
 
-  vim.api.nvim_set_hl(ns, group, {
+  vim.api.nvim_set_hl(opts.ns, group, {
     fg = color,
     undercurl = false,
     underline = false,
@@ -36,7 +32,6 @@ end
 
 local createExtmark = function (bufnr, ns, hl_group, range)
   local priority = vim.highlight.priorities.treesitter + 1000
-  hl_group = getDimHighlight(ns, hl_group)
   return vim.api.nvim_buf_set_extmark(bufnr, ns, range.lnum, range.col, {
     end_line = range.lnum,
     end_col = range.end_col,
@@ -93,7 +88,8 @@ local getDiagnosticNodes = function (diagnostic)
   return children
 end
 
-M.highlightDiagnostic = function (ns, diagnostic)
+M.highlightDiagnostic = function (diagnostic, opts)
+  local ns = opts.ns
   local d = diagnostic
   local children = getDiagnosticNodes(d)
   for _, child in ipairs(children) do
@@ -109,14 +105,10 @@ M.highlightDiagnostic = function (ns, diagnostic)
         end_lnum = end_row,
         end_col = end_col
       }
-      createExtmark(d.bufnr, ns, hl_group, node_range)
+      local dim_group = getDimHighlight(hl_group, opts)
+      createExtmark(d.bufnr, ns, dim_group, node_range)
     end
   end
-end
-
-M.init = function (params)
-  opts = vim.tbl_extend('force', opts, params or {})
-  return M
 end
 
 return M
