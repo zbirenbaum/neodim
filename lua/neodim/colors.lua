@@ -10,6 +10,7 @@ colors.hex_to_rgb = function(hex_str)
 end
 
 colors.rgb_to_hex = function (rgb)
+  if not rgb then return end
   local val = string.format("%02X", bit.band(rgb, 0xFFFFFF))
   if #val < 6 then
     val = string.rep("0", 6 - #val) .. val

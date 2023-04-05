@@ -14,19 +14,26 @@ end
 
 --- @param diagnostic table
 --  @param isused boolean
-filter.used = function (diagnostic, isused)
+
+function filter.used (diagnostic, isused)
+  local result = function (unused)
+    if isused then
+      return not unused
+    end
+    return unused
+  end
+
   local userData = vim.tbl_get(
     diagnostic,
     "user_data",
     "lsp"
   ) or {}
+
   local checkTags = hasUnusedTags(diagnostic.tags) or hasUnusedTags(userData.tags)
+  if checkTags then return result(checkTags) end
+
   local checkMsg = unusedInString(diagnostic.msg) or unusedInString(userData.code)
-  local unused = checkTags or checkMsg
-  if isused then
-    return not unused
-  end
-  return unused
+  if checkMsg then return result(checkMsg) end
 end
 
 filter.getUnused = function (diagnostics)
