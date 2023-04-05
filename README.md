@@ -5,10 +5,23 @@ This plugin takes heavy inspiration from https://github.com/NarutoXY/dim.lua. Th
 
 ### Setup:
 
+Install the V2 branch for the performance and functionality overhauled beta release:
+```lua
+{
+  "zbirenbaum/neodim",
+  event = "LspAttach",
+  branch = v2,
+  config = function ()
+    require("neodim").setup()
+  end,
+}
+
+```
+
 Install the plugin like any other:
 
 ```lua
-use {
+{
   "zbirenbaum/neodim",
   event = "LspAttach",
   config = function ()
