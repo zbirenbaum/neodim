@@ -1,50 +1,61 @@
 local filter = {}
 
-local unusedInString = function (str)
+local unusedString = function (str)
   return str and string.find(
     str,
     ".*[uU]nused.*"
   ) ~= nil
 end
 
-local hasUnusedTags = function (tags)
+local unusedTags = function (tags)
   local target = vim.lsp.protocol.DiagnosticTag.Unnecessary
   return tags and vim.tbl_contains(tags, target)
 end
 
---- @param diagnostic table
---  @param isused boolean
-
-function filter.used (diagnostic, isused)
-  local result = function (unused)
-    if isused then
-      return not unused
-    end
-    return unused
-  end
-
-  local userData = vim.tbl_get(
-    diagnostic,
-    "user_data",
-    "lsp"
-  ) or {}
-
-  local checkTags = hasUnusedTags(diagnostic.tags) or hasUnusedTags(userData.tags)
-  if checkTags then return result(checkTags) end
-
-  local checkMsg = unusedInString(diagnostic.msg) or unusedInString(userData.code)
-  if checkMsg then return result(checkMsg) end
+local getUserData = function (diagnostic)
+  return vim.tbl_get(diagnostic, "user_data", "lsp") or {}
 end
 
+local hasUnusedTags = function (diagnostic)
+  local userdata = getUserData(diagnostic)
+  return unusedTags(diagnostic.tags) or unusedTags(userdata.tags)
+end
+
+local hasUnusedString = function (diagnostic)
+  local userdata = getUserData(diagnostic)
+  return unusedString(diagnostic.msg) or unusedString(userdata.code)
+end
+
+
+filter.checks = {
+  hasUnusedTags,
+  hasUnusedString
+}
+
 filter.getUnused = function (diagnostics)
+  -- if any check returns true diagnoistic is unused
+  local unusedFilter = function (d)
+    return #vim.tbl_filter(function (check)
+      return check(d)
+    end, filter.checks) > 0
+  end
+
   return vim.tbl_filter(function (d)
-    return filter.used(d, false)
+    return unusedFilter(d)
   end, diagnostics)
 end
 
+
 filter.getUsed = function (diagnostics)
+  -- if all checks return false diagnoistic is used
+  local usedFilter = function (d)
+    return #vim.tbl_filter(function (check)
+      return check(d)
+    end, filter.checks) == 0
+  end
+
   return vim.tbl_filter(function (d)
-    return filter.used(d, true)
+    return usedFilter(d)
   end, diagnostics)
 end
 
