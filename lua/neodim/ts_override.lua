@@ -7,10 +7,8 @@ local diagnostic_nodes = {}
 local hl_map = setmetatable({}, { __mode = 'v' })
 
 local ns = api.nvim_create_namespace('treesitter/highlighter')
-
 local function set_override (opts)
   local bg = colors.rgb_to_hex(tonumber(opts.blend_color, 16))
-
   local function on_line_impl(self, buf, line, is_spell_nav)
     self.tree:for_each_tree(function(tstree, tree)
       if not tstree then return end
@@ -19,7 +17,8 @@ local function set_override (opts)
       -- Only worry about trees within the line range
       if root_start_row > line or root_end_row < line then return end
       local state = self:get_highlight_state(tstree)
-      local highlighter_query = self:get_query(tree:lang())
+      local lang = tree:lang()
+      local highlighter_query = self:get_query(lang)
       -- Some injected languages may not have highlight queries.
       if not highlighter_query:query() then return end
       if state.iter == nil or state.next_row < line then
@@ -94,16 +93,22 @@ local function set_override (opts)
   return _on_line
 end
 
-TSOverride.updateUnused = function (diagnostics)
-  linemap = {}
-  diagnostic_nodes = {}
-  for _, d in ipairs(diagnostics) do
-    linemap[d.lnum] = linemap[d.lnum] or {}
-    linemap[d.lnum][d.col] = {}
-  end
-end
 
 TSOverride.init = function (opts)
+  local disable = opts.disable or {}
+
+  TSOverride.updateUnused = function (diagnostics, bufnr)
+    linemap = {}
+    diagnostic_nodes = {}
+    local ft = vim.api.nvim_buf_get_option(bufnr, 'filetype')
+    if disable[ft] then return end
+    for _, d in ipairs(diagnostics) do
+      linemap[d.lnum] = linemap[d.lnum] or {}
+      linemap[d.lnum][d.col] = {}
+    end
+  end
+  -- these are 'private' but technically accessable
+  -- if that every changes, we will have to override the whole TSHighlighter
   api.nvim_set_decoration_provider(ns, {
     on_buf = TSHighlighter._on_buf,
     on_win = TSHighlighter._on_win,
