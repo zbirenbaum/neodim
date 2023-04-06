@@ -12,13 +12,19 @@ Install the V2 branch for the performance and functionality overhauled beta rele
   event = "LspAttach",
   branch = v2,
   config = function ()
-    require("neodim").setup()
+    require("neodim").setup({
+      refresh_delay = 75, -- time in ms to wait after typing before refresh diagnostics
+      alpha = .75,
+      blend_color = "#000000",
+      hide = { underline = true, virtual_text = true, signs = true },
+      disable = {}, -- table of filetypes to disable neodim
+    })
   end,
 }
 
 ```
 
-Install the plugin like any other:
+Install the stable version of the plugin:
 
 ```lua
 {
