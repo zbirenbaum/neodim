@@ -10,25 +10,26 @@ local default_opts = {
   disable = {},
 }
 
-local hideUnusedDecorations = function (dim_opts)
-
-  local createHandler = function (old_handler)
-    return {
-      show = function (namespace, bufnr, diagnostics, opts)
-        local ft = vim.api.nvim_buf_get_option(bufnr, 'filetype')
-        if not dim_opts.disable[ft] then return end
-
+local createHandler = function (old_handler, disable)
+  return {
+    show = function (namespace, bufnr, diagnostics, opts)
+      local ft = vim.api.nvim_buf_get_option(bufnr, 'filetype')
+      if not disable[ft] then
         diagnostics = filter.getUsed(diagnostics)
-        old_handler.show(namespace, bufnr, diagnostics, opts)
-      end,
-      hide = old_handler.hide
-    }
-  end
+      end
+      old_handler.show(namespace, bufnr, diagnostics, opts)
+    end,
+    hide = old_handler.hide
+  }
+end
 
+local hideUnusedDecorations = function (opts)
   local handlers_copy = vim.tbl_extend("force", {}, require("vim.diagnostic").handlers) -- gets a copy
   local diag = vim.diagnostic -- updates globally
-  for d_handler, enable in pairs(dim_opts.hide) do
-    diag.handlers[d_handler] = enable and createHandler(handlers_copy[d_handler]) or handlers_copy[d_handler]
+  for d_handler, enable in pairs(opts.hide) do
+    if enable then
+      diag.handlers[d_handler] = createHandler(handlers_copy[d_handler], opts.disable)
+    end
   end
 end
 
@@ -63,6 +64,7 @@ end
 dim.setup = function (opts)
   opts = vim.tbl_extend("force", default_opts, opts or {})
   opts.blend_color = opts.blend_color:gsub('#', '')
+
   for _, language in ipairs(opts.disable or {}) do
     opts.disable[language] = true
   end
