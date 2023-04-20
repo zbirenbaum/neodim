@@ -8,6 +8,7 @@ local hl_map = setmetatable({}, { __mode = 'v' })
 
 local ns = api.nvim_create_namespace('treesitter/highlighter')
 local function set_override (opts)
+  local priority = opts.priority
   local bg = colors.rgb_to_hex(tonumber(opts.blend_color, 16))
   local function on_line_impl(self, buf, line, is_spell_nav)
     self.tree:for_each_tree(function(tstree, tree)
@@ -60,8 +61,12 @@ local function set_override (opts)
               hl = hl_map[capture_name],
             }
           end
+          local hl_priority = (tonumber(metadata.priority) or 100) + spell_pri_offset -- Low but leaves room below
+
           if diagnostic_nodes[node] then
             hl = diagnostic_nodes[node].hl
+            -- only affect priority when there is a diagnostic node
+            hl_priority = priority
           end
 
           api.nvim_buf_set_extmark(buf, ns, start_row, start_col, {
@@ -69,7 +74,7 @@ local function set_override (opts)
             end_col = end_col,
             hl_group = hl,
             ephemeral = true,
-            priority = (tonumber(metadata.priority) or 100) + spell_pri_offset, -- Low but leaves room below
+            priority = hl_priority,
             conceal = metadata.conceal,
             spell = spell,
           })
