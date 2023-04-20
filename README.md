@@ -17,6 +17,7 @@ Install the V2 branch for the performance and functionality overhauled beta rele
       alpha = .75,
       blend_color = "#000000",
       hide = { underline = true, virtual_text = true, signs = true },
+      priority = 100, -- priority of dim highlights (increasing may interfere with semantic tokens!!)
       disable = {}, -- table of filetypes to disable neodim
     })
   end,
