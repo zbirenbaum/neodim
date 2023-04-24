@@ -10,7 +10,7 @@ Install the V2 branch for the performance and functionality overhauled beta rele
 {
   "zbirenbaum/neodim",
   event = "LspAttach",
-  branch = v2,
+  branch = "v2",
   config = function ()
     require("neodim").setup({
       refresh_delay = 75, -- time in ms to wait after typing before refresh diagnostics
