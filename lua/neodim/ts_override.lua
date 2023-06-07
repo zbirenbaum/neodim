@@ -1,4 +1,5 @@
 local TSHighlighter = require('vim.treesitter.highlighter')
+local treesitter = require('vim.treesitter')
 local colors = require('neodim.colors')
 local api = vim.api
 local TSOverride = {}
@@ -30,7 +31,7 @@ local function set_override (opts)
       while line >= state.next_row do
         local capture, node, metadata = state.iter()
         if capture == nil then break end
-        local range = vim.treesitter.get_range(node, buf, metadata[capture])
+        local range = treesitter.get_range(node, buf, metadata[capture])
         local start_row, start_col, _, end_row, end_col, _ = unpack(range)
         local hl = highlighter_query.hl_cache[capture]
         local capture_name = highlighter_query:query().captures[capture]
@@ -105,7 +106,9 @@ TSOverride.init = function (opts)
   TSOverride.updateUnused = function (diagnostics, bufnr)
     linemap = {}
     diagnostic_nodes = {}
-    local ft = vim.api.nvim_buf_get_option(bufnr, 'filetype')
+    local ft = vim.api.nvim_get_option_value('filetype', {
+      buf = bufnr
+    })
     if disable[ft] then return end
     for _, d in ipairs(diagnostics) do
       linemap[d.lnum] = linemap[d.lnum] or {}
