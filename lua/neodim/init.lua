@@ -14,7 +14,7 @@ local default_opts = {
 local createHandler = function (old_handler, disable)
   return {
     show = function (namespace, bufnr, diagnostics, opts)
-      local ft = vim.api.nvim_buf_get_option(bufnr, 'filetype')
+      local ft = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
       if not disable[ft] then
         diagnostics = filter.getUsed(diagnostics)
       end

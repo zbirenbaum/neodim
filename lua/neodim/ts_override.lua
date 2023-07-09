@@ -87,7 +87,7 @@ local function set_override (opts)
     end)
   end
 
-  local function _on_line (_, __, buf, line, _)
+  local function _on_line (_, _, buf, line, _)
     local self = TSHighlighter.active[buf]
     if not self then
       return
@@ -117,12 +117,14 @@ TSOverride.init = function (opts)
   end
   -- these are 'private' but technically accessable
   -- if that every changes, we will have to override the whole TSHighlighter
+  ---@diagnostic disable: invisible
   api.nvim_set_decoration_provider(ns, {
     on_buf = TSHighlighter._on_buf,
     on_win = TSHighlighter._on_win,
     on_line = set_override(opts),
     _on_spell_nav = TSHighlighter._on_spell_nav,
   })
+  ---@diagnostic enable
 end
 
 return TSOverride
