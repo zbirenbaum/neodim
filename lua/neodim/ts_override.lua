@@ -1,36 +1,43 @@
-local TSHighlighter = require('vim.treesitter.highlighter')
-local treesitter = require('vim.treesitter')
-local colors = require('neodim.colors')
+local TSHighlighter = require 'vim.treesitter.highlighter'
+local treesitter = require 'vim.treesitter'
+local colors = require 'neodim.colors'
 local api = vim.api
 local TSOverride = {}
 local linemap = {}
 local diagnostic_nodes = {}
 local hl_map = setmetatable({}, { __mode = 'v' })
 
-local ns = api.nvim_create_namespace('treesitter/highlighter')
-local function set_override (opts)
+local ns = api.nvim_create_namespace 'treesitter/highlighter'
+local function set_override(opts)
   local priority = opts.priority
   local bg = colors.rgb_to_hex(tonumber(opts.blend_color, 16))
   local function on_line_impl(self, buf, line, is_spell_nav)
     self.tree:for_each_tree(function(tstree, tree)
-      if not tstree then return end
+      if not tstree then
+        return
+      end
       local root_node = tstree:root()
       local root_start_row, _, root_end_row, _ = root_node:range()
       -- Only worry about trees within the line range
-      if root_start_row > line or root_end_row < line then return end
+      if root_start_row > line or root_end_row < line then
+        return
+      end
       local state = self:get_highlight_state(tstree)
       local lang = tree:lang()
       local highlighter_query = self:get_query(lang)
       -- Some injected languages may not have highlight queries.
-      if not highlighter_query:query() then return end
+      if not highlighter_query:query() then
+        return
+      end
       if state.iter == nil or state.next_row < line then
-        state.iter =
-          highlighter_query:query():iter_captures(root_node, self.bufnr, line, root_end_row + 1)
+        state.iter = highlighter_query:query():iter_captures(root_node, self.bufnr, line, root_end_row + 1)
       end
 
       while line >= state.next_row do
         local capture, node, metadata = state.iter()
-        if capture == nil then break end
+        if capture == nil then
+          break
+        end
         local range = treesitter.get_range(node, buf, metadata[capture])
         local start_row, start_col, _, end_row, end_col, _ = unpack(range)
         local hl = highlighter_query.hl_cache[capture]
@@ -52,7 +59,7 @@ local function set_override (opts)
               local color = colors.blend(fg, bg, opts.alpha)
               cur_hl.fg = color
               local unused_name = '@' .. capture_name .. 'Unused'
-              vim.api.nvim_set_hl(0, unused_name, cur_hl);
+              vim.api.nvim_set_hl(0, unused_name, cur_hl)
               hl_map[capture_name] = unused_name
             end
 
@@ -87,7 +94,7 @@ local function set_override (opts)
     end)
   end
 
-  local function _on_line (_, _, buf, line, _)
+  local function _on_line(_, _, buf, line, _)
     local self = TSHighlighter.active[buf]
     if not self then
       return
@@ -99,17 +106,18 @@ local function set_override (opts)
   return _on_line
 end
 
-
-TSOverride.init = function (opts)
+TSOverride.init = function(opts)
   local disable = opts.disable or {}
 
-  TSOverride.updateUnused = function (diagnostics, bufnr)
+  TSOverride.updateUnused = function(diagnostics, bufnr)
     linemap = {}
     diagnostic_nodes = {}
     local ft = vim.api.nvim_get_option_value('filetype', {
-      buf = bufnr
+      buf = bufnr,
     })
-    if disable[ft] then return end
+    if disable[ft] then
+      return
+    end
     for _, d in ipairs(diagnostics) do
       linemap[d.lnum] = linemap[d.lnum] or {}
       linemap[d.lnum][d.col] = {}
