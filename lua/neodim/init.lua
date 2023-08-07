@@ -2,6 +2,7 @@ local dim = {}
 local filter = require 'neodim.filter'
 local ts_override = require 'neodim.ts_override'
 
+---@class neodim.opts
 local default_opts = {
   refresh_delay = 75,
   alpha = 0.75,
@@ -24,6 +25,7 @@ local createHandler = function(old_handler, disable)
   }
 end
 
+---@param opts neodim.opts
 local hideUnusedDecorations = function(opts)
   local handlers_copy = vim.tbl_extend('force', {}, require('vim.diagnostic').handlers) -- gets a copy
   local diag = vim.diagnostic -- updates globally
@@ -34,7 +36,10 @@ local hideUnusedDecorations = function(opts)
   end
 end
 
+---@param opts neodim.opts
 local createDimHandlers = function(opts)
+  ---@param bufnr integer
+  ---@param diagnostics Diagnostic[]
   local show = function(_, bufnr, diagnostics, _)
     local unused_diagnostics = filter.getUnused(diagnostics)
     ts_override.updateUnused(unused_diagnostics, bufnr)
@@ -62,7 +67,9 @@ local createDimHandlers = function(opts)
   }
 end
 
+---@param opts neodim.opts
 dim.setup = function(opts)
+  ---@type neodim.opts
   opts = vim.tbl_extend('force', default_opts, opts or {})
   opts.blend_color = opts.blend_color:gsub('#', '')
 

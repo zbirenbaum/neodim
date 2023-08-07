@@ -3,14 +3,25 @@ local treesitter = require 'vim.treesitter'
 local colors = require 'neodim.colors'
 local api = vim.api
 local TSOverride = {}
+---@type (TSNode|{})[][]
 local linemap = {}
+---@type table<TSNode, { start_col: integer, start_row: integer, hl: string }>
 local diagnostic_nodes = {}
+---@type table<string, string>
 local hl_map = setmetatable({}, { __mode = 'v' })
 
 local ns = api.nvim_create_namespace 'treesitter/highlighter'
+
+---@param opts neodim.opts
+---@return function
 local function set_override(opts)
   local priority = opts.priority
   local bg = colors.rgb_to_hex(tonumber(opts.blend_color, 16))
+
+  ---@param self TSHighlighter
+  ---@param buf integer
+  ---@param line integer
+  ---@param is_spell_nav boolean
   local function on_line_impl(self, buf, line, is_spell_nav)
     self.tree:for_each_tree(function(tstree, tree)
       if not tstree then
@@ -39,7 +50,9 @@ local function set_override(opts)
           break
         end
         local range = treesitter.get_range(node, buf, metadata[capture])
+        ---@type integer, integer, integer, integer, integer, integer
         local start_row, start_col, _, end_row, end_col, _ = unpack(range)
+        ---@type integer|string highlight id or highlight name
         local hl = highlighter_query.hl_cache[capture]
         local capture_name = highlighter_query:query().captures[capture]
 
@@ -52,6 +65,7 @@ local function set_override(opts)
         if hl and end_row >= line and (not is_spell_nav or spell ~= nil) then
           if linemap[start_row] and linemap[start_row][start_col] then
             linemap[start_row][start_col] = node
+            ---@type vim.api.keyset.highlight
             local cur_hl = vim.api.nvim_get_hl(0, { id = hl, link = false })
 
             if not hl_map[capture_name] and cur_hl and cur_hl.fg then
@@ -94,6 +108,8 @@ local function set_override(opts)
     end)
   end
 
+  ---@param buf integer
+  ---@param line integer
   local function _on_line(_, _, buf, line, _)
     local self = TSHighlighter.active[buf]
     if not self then
@@ -106,9 +122,12 @@ local function set_override(opts)
   return _on_line
 end
 
+---@param opts neodim.opts
 TSOverride.init = function(opts)
   local disable = opts.disable or {}
 
+  ---@param diagnostics Diagnostic[]
+  ---@param bufnr integer
   TSOverride.updateUnused = function(diagnostics, bufnr)
     linemap = {}
     diagnostic_nodes = {}

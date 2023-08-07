@@ -1,5 +1,7 @@
 local colors = {}
 
+---@param hex_str string
+---@return { [1]: integer, [2]: integer, [3]: integer }
 colors.hex_to_rgb = function(hex_str)
   local hex = '[abcdef0-9][abcdef0-9]'
   local pat = '^#(' .. hex .. ')(' .. hex .. ')(' .. hex .. ')$'
@@ -9,10 +11,9 @@ colors.hex_to_rgb = function(hex_str)
   return { tonumber(red, 16), tonumber(green, 16), tonumber(blue, 16) }
 end
 
+---@param rgb integer
+---@return string
 colors.rgb_to_hex = function(rgb)
-  if not rgb then
-    return
-  end
   local val = string.format('%02X', bit.band(rgb, 0xFFFFFF))
   if #val < 6 then
     val = string.rep('0', 6 - #val) .. val
@@ -20,9 +21,13 @@ colors.rgb_to_hex = function(rgb)
   return string.format('#%s', val)
 end
 
+---@param fg string
+---@param bg string
+---@param alpha number
+---@return string
 colors.blend = function(fg, bg, alpha)
-  fg = colors.hex_to_rgb(fg)
-  bg = colors.hex_to_rgb(bg)
+  fg = colors.hex_to_rgb(fg) ---@diagnostic disable-line: cast-local-type
+  bg = colors.hex_to_rgb(bg) ---@diagnostic disable-line: cast-local-type
   local blendChannel = function(i)
     local ret = (alpha * fg[i] + ((1 - alpha) * bg[i]))
     return math.floor(math.min(math.max(0, ret), 255) + 0.5)
