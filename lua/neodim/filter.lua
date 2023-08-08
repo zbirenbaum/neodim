@@ -6,33 +6,17 @@ local unusedString = function(str)
   return str and string.find(str, '.*[uU]nused.*') ~= nil
 end
 
----@param tags table
----@return boolean
-local unusedTags = function(tags)
-  local target = vim.lsp.protocol.DiagnosticTag.Unnecessary
-  return tags and vim.tbl_contains(tags, target)
-end
-
----@param diagnostic Diagnostic
----@return table
-local getUserData = function(diagnostic)
-  return vim.tbl_get(diagnostic, 'user_data', 'lsp') or {}
-end
-
 ---@param diagnostic Diagnostic
 ---@return boolean
 local hasUnusedTags = function(diagnostic)
-  local userdata = getUserData(diagnostic)
-  -- FIXME: `tags` is an undefined field
-  return unusedTags(diagnostic.tags) or unusedTags(userdata.tags)
+  -- NOTE: `_tags` is available as of Neovim 0.10.0
+  return diagnostic._tags and diagnostic._tags.unnecessary
 end
 
 ---@param diagnostic Diagnostic
 ---@return boolean
 local hasUnusedString = function(diagnostic)
-  local userdata = getUserData(diagnostic)
-  -- FIXME: `msg` is an undefined field
-  return unusedString(diagnostic.msg) or unusedString(userdata.code)
+  return unusedString(diagnostic.message) or unusedString(diagnostic.code)
 end
 
 filter.checks = {
