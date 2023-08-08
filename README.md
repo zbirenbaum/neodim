@@ -5,6 +5,8 @@ This plugin takes heavy inspiration from https://github.com/NarutoXY/dim.lua. Th
 
 ### Setup:
 
+Neovim 0.10.0 is required for this plugin to work properly.
+
 ```lua
 {
   "zbirenbaum/neodim",
