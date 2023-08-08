@@ -1,6 +1,7 @@
 local dim = {}
 local filter = require 'neodim.filter'
-local ts_override = require 'neodim.ts_override'
+---@type neodim.TSOverride
+local ts_override
 
 ---@class neodim.opts
 local default_opts = {
@@ -12,12 +13,12 @@ local default_opts = {
   disable = {},
 }
 
-local createHandler = function(old_handler, disable)
+local create_handler = function(old_handler, disable)
   return {
     show = function(namespace, bufnr, diagnostics, opts)
       local ft = vim.api.nvim_get_option_value('filetype', { buf = bufnr })
       if not disable[ft] then
-        diagnostics = filter.getUsed(diagnostics)
+        diagnostics = filter.get_used(diagnostics)
       end
       old_handler.show(namespace, bufnr, diagnostics, opts)
     end,
@@ -26,23 +27,23 @@ local createHandler = function(old_handler, disable)
 end
 
 ---@param opts neodim.opts
-local hideUnusedDecorations = function(opts)
+local hide_unused_decorations = function(opts)
   local handlers_copy = vim.tbl_extend('force', {}, require('vim.diagnostic').handlers) -- gets a copy
   local diag = vim.diagnostic -- updates globally
   for d_handler, enable in pairs(opts.hide) do
     if enable then
-      diag.handlers[d_handler] = createHandler(handlers_copy[d_handler], opts.disable)
+      diag.handlers[d_handler] = create_handler(handlers_copy[d_handler], opts.disable)
     end
   end
 end
 
 ---@param opts neodim.opts
-local createDimHandlers = function(opts)
+local create_dim_handlers = function(opts)
   ---@param bufnr integer
   ---@param diagnostics Diagnostic[]
   local show = function(_, bufnr, diagnostics, _)
-    local unused_diagnostics = filter.getUnused(diagnostics)
-    ts_override.updateUnused(unused_diagnostics, bufnr)
+    local unused_diagnostics = filter.get_unused(diagnostics)
+    ts_override:update_unused(unused_diagnostics, bufnr)
   end
 
   local hide = function(_, bufnr)
@@ -77,9 +78,9 @@ dim.setup = function(opts)
     opts.disable[language] = true
   end
 
-  hideUnusedDecorations(opts)
-  vim.diagnostic.handlers['dim/unused'] = createDimHandlers(opts)
-  ts_override.init(opts)
+  hide_unused_decorations(opts)
+  vim.diagnostic.handlers['dim/unused'] = create_dim_handlers(opts)
+  ts_override = require('neodim.ts_override').init(opts)
 end
 
 return dim
