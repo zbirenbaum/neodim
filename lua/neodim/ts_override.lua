@@ -1,6 +1,7 @@
 local TSHighlighter = require 'vim.treesitter.highlighter'
 local treesitter = require 'vim.treesitter'
 local colors = require 'neodim.colors'
+local lsp = require 'neodim.lsp'
 local api = vim.api
 
 local ns = api.nvim_create_namespace 'treesitter/highlighter'
@@ -80,19 +81,19 @@ TSOverride.is_unused = function(self, start_row, start_col)
 end
 
 ---@param hl vim.api.keyset.highlight
----@param capture_name string
+---@param hl_name string
 ---@return string
-TSOverride.get_dim_color = function(self, hl, capture_name)
-  if not self.hl_map[capture_name] and hl and hl.fg then
+TSOverride.get_dim_color = function(self, hl, hl_name)
+  if not self.hl_map[hl_name] and hl and hl.fg then
     local fg = colors.rgb_to_hex(hl.fg)
     local color = colors.blend(fg, self.bg, self.opts.alpha)
     hl.fg = color
-    local unused_name = '@' .. capture_name .. 'Unused'
+    local unused_name = hl_name .. 'Unused'
     api.nvim_set_hl(0, unused_name, hl)
-    self.hl_map[capture_name] = unused_name
+    self.hl_map[hl_name] = unused_name
   end
 
-  return self.hl_map[capture_name]
+  return self.hl_map[hl_name]
 end
 
 ---@param highlighter TSHighlighter
@@ -132,36 +133,40 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
       ---@type integer, integer, integer, integer, integer, integer
       local start_row, start_col, _, end_row, end_col, _ = unpack(range)
 
-      local capture_name = highlighter_query:query().captures[capture]
-      local spell = nil ---@type boolean?
-      if capture_name == 'spell' then
-        spell = true
-      elseif capture_name == 'nospell' then
-        spell = false
-      end
-
-      ---@type integer|string highlight id or highlight name
-      local hl = highlighter_query.hl_cache[capture]
-
-      if hl and end_row >= line then
-        -- Give nospell a higher priority so it always overrides spell captures.
-        local spell_pri_offset = capture_name == 'nospell' and 1 or 0
-        local hl_priority = (tonumber(metadata.priority) or vim.highlight.priorities.treesitter) + spell_pri_offset -- Low but leaves room below
-
-        if self:is_unused(start_row, start_col) then
-          hl = self:get_dim_color(api.nvim_get_hl(0, { id = hl, link = false }), capture_name)
-          hl_priority = self.opts.priority
-        end
-
-        api.nvim_buf_set_extmark(buf, ns, start_row, start_col, {
+      if end_row >= line then
+        ---@type vim.api.keyset.set_extmark
+        local mark = {
           end_line = end_row,
           end_col = end_col,
-          hl_group = hl,
           ephemeral = true,
-          priority = hl_priority,
           conceal = metadata.conceal,
-          spell = spell,
-        })
+        }
+
+        ---@type integer|string highlight id or highlight name
+        local hl = highlighter_query.hl_cache[capture]
+
+        local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
+        if sttoken_mark_data and self:is_unused(start_row, start_col) then
+          hl = self:get_dim_color(sttoken_mark_data.hl_opts, sttoken_mark_data.hl_name)
+          mark.priority = self.opts.priority
+        elseif hl then
+          local capture_name = highlighter_query:query().captures[capture]
+
+          -- Give nospell a higher priority so it always overrides spell captures.
+          local spell_pri_offset = capture_name == 'nospell' and 1 or 0
+          mark.priority = (tonumber(metadata.priority) or vim.highlight.priorities.treesitter) + spell_pri_offset -- Low but leaves room below
+
+          if self:is_unused(start_row, start_col) then
+            hl = self:get_dim_color(api.nvim_get_hl(0, { id = hl, link = false }), '@' .. capture_name)
+            mark.priority = self.opts.priority
+          end
+          mark.spell = capture_name == 'spell' and true or capture_name == 'nospell' and false or nil
+        end
+
+        if hl then
+          mark.hl_group = hl
+          api.nvim_buf_set_extmark(buf, ns, start_row, start_col, mark)
+        end
       end
 
       if start_row > line then

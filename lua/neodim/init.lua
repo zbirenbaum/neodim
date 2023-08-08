@@ -9,7 +9,7 @@ local default_opts = {
   alpha = 0.75,
   blend_color = '#000000',
   hide = { underline = true, virtual_text = true, signs = true },
-  priority = 100,
+  priority = 128,
   disable = {},
 }
 
