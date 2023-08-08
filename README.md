@@ -5,45 +5,22 @@ This plugin takes heavy inspiration from https://github.com/NarutoXY/dim.lua. Th
 
 ### Setup:
 
-Install the V2 branch for the performance and functionality overhauled beta release:
-```lua
-{
-  "zbirenbaum/neodim",
-  event = "LspAttach",
-  branch = v2,
-  config = function ()
-    require("neodim").setup({
-      refresh_delay = 75, -- time in ms to wait after typing before refresh diagnostics
-      alpha = .75,
-      blend_color = "#000000",
-      hide = { underline = true, virtual_text = true, signs = true },
-      priority = 100, -- priority of dim highlights (increasing may interfere with semantic tokens!!)
-      disable = {}, -- table of filetypes to disable neodim
-    })
-  end,
-}
-
-```
-
-Install the stable version of the plugin:
-
 ```lua
 {
   "zbirenbaum/neodim",
   event = "LspAttach",
   config = function ()
     require("neodim").setup({
+      refresh_delay = 75,
       alpha = 0.75,
-      blend_color = "#000000",
-      update_in_insert = {
-        enable = true,
-        delay = 100,
-      },
+      blend_color = '#000000',
       hide = {
-        virtual_text = true,
-        signs = true,
         underline = true,
-      }
+        virtual_text = true,
+        signs = true ,
+      },
+      priority = 128,
+      disable = {},
     })
   end
 }
@@ -76,28 +53,6 @@ require("neodim").setup({
 })
 ```
 
-##### update_in_insert:
-**Important: This option should **NOT** be used if update_in_insert is set to true in your diagnostic config. Previously, that was how it was recommended to get live updates, but now this is a much better option.**
-
-Update in insert mode from the diagnostic config causes all diagnostic handlers to update in insert mode, causing visual flashes and is a general annoyance fairly often. However, the update_in_insert feature implemented in neodim functions very differently. neodim will be the only diagnostic handler to update in insert mode. Additionally, this functionality was implemented via the hide callback, which is triggered while typing by the diagnostics automatically, and rather than call a function with a TextChanged autocmd, it cancels one instead. Thus, only after you have not typed for a very short amount of time will things refresh, greatly reducing visual flashing but allowing updates without going into normal mode. The delay field allows you to customize how long this period is, but be warned that lower delays will lead to higher cpu usage.
-
-Example:
-```lua
-require("neodim").setup({
-  update_in_insert = {
-    enable = false, -- disable updates in insert mode
-  },
-})
-```
-
-```lua
-require("neodim").setup({
-  update_in_insert = {
-    delay = 200, -- increase the delay for updates to 200ms between insertions
-  },
-})
-```
-
 #### Decoration Options
 All decorations can be hidden for diagnostics pertaining to unused tokens. By default, hiding all of them is enabled, but you can re-enable them by changing the config table passed to neodim. It is important to note that regardless of what you put in this configuration, neodim will always respect settings created with `vim.diagnostic.config`. For example, if all underline decorations are disabled by running `vim.diagnostic.config({ underline=false })`, neodim will ***not*** re-enable them for "unused" diagnostics.
 
@@ -106,7 +61,7 @@ Example:
 ```lua
 -- re-enable only sign decorations for 'unused' diagnostics
 require("neodim").setup({
-  hide = {signs = false }
+  hide = { signs = false }
 })
 ```
 
