@@ -10,7 +10,6 @@ local ns = api.nvim_create_namespace 'treesitter/highlighter'
 ---@field opts neodim.opts
 ---@field diagnostics_map (true?)[][]
 ---@field hl_map table<string, string>
----@field bg string
 local TSOverride = {}
 
 ---@param opts neodim.opts
@@ -21,12 +20,8 @@ TSOverride.init = function(opts)
   })
 
   self.opts = opts
-  self.opts.disable = self.opts.disable or {}
-
   self.diagnostics_map = {}
   self.hl_map = setmetatable({}, { __mode = 'v' })
-
-  self.bg = colors.rgb_to_hex(tonumber(self.opts.blend_color, 16))
 
   -- these are 'private' but technically accessable
   -- if that every changes, we will have to override the whole TSHighlighter
@@ -86,7 +81,7 @@ end
 TSOverride.get_dim_color = function(self, hl, hl_name)
   if not self.hl_map[hl_name] and hl and hl.fg then
     local fg = colors.rgb_to_hex(hl.fg)
-    local color = colors.blend(fg, self.bg, self.opts.alpha)
+    local color = colors.blend(fg, self.opts.blend_color, self.opts.alpha)
     hl.fg = color
     local unused_name = hl_name .. 'Unused'
     api.nvim_set_hl(0, unused_name, hl)

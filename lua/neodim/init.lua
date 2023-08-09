@@ -86,9 +86,8 @@ end
 dim.setup = function(opts)
   ---@type neodim.opts
   opts = vim.tbl_extend('force', default_opts, opts or {})
-  opts.blend_color = opts.blend_color:gsub('#', '')
 
-  for _, language in ipairs(opts.disable or {}) do
+  for _, language in ipairs(opts.disable) do
     opts.disable[language] = true
   end
 
