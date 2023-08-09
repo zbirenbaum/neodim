@@ -1,13 +1,27 @@
 local dim = {}
+local colors = require 'neodim.colors'
 local filter = require 'neodim.filter'
----@type neodim.TSOverride
+---@type neodim.TSOverride Initialize in dim.setup()
 local ts_override
+
+local get_bg = function()
+  ---@type vim.api.keyset.highlight
+  local normal = vim.api.nvim_get_hl(0, { name = 'Normal', link = false })
+  if normal and normal.bg then
+    return colors.rgb_to_hex(normal.bg)
+  end
+  if vim.o.background == 'light' then
+    return '#ffffff'
+  else
+    return '#000000'
+  end
+end
 
 ---@class neodim.opts
 local default_opts = {
   refresh_delay = 75,
   alpha = 0.75,
-  blend_color = '#000000',
+  blend_color = get_bg(),
   hide = { underline = true, virtual_text = true, signs = true },
   priority = 128,
   disable = {},
