@@ -1,55 +1,75 @@
 local dim = {}
-local filter = require('neodim.filter')
-local ts_override = require('neodim.ts_override')
+local colors = require 'neodim.colors'
+local filter = require 'neodim.filter'
+---@type neodim.TSOverride Initialize in dim.setup()
+local ts_override
 
+local get_bg = function()
+  ---@type vim.api.keyset.highlight
+  local normal = vim.api.nvim_get_hl(0, { name = 'Normal', link = false })
+  if normal and normal.bg then
+    return colors.rgb_to_hex(normal.bg)
+  end
+  if vim.o.background == 'light' then
+    return '#ffffff'
+  else
+    return '#000000'
+  end
+end
+
+---@class neodim.opts
 local default_opts = {
   refresh_delay = 75,
-  alpha = .75,
-  blend_color = "#000000",
+  alpha = 0.75,
+  blend_color = get_bg(),
   hide = { underline = true, virtual_text = true, signs = true },
-  priority = 100,
+  priority = 128,
   disable = {},
 }
 
-local createHandler = function (old_handler, disable)
+local create_handler = function(old_handler, disable)
   return {
-    show = function (namespace, bufnr, diagnostics, opts)
-      local ft = vim.api.nvim_buf_get_option(bufnr, 'filetype')
+    show = function(namespace, bufnr, diagnostics, opts)
+      local ft = vim.api.nvim_get_option_value('filetype', { buf = bufnr })
       if not disable[ft] then
-        diagnostics = filter.getUsed(diagnostics)
+        diagnostics = filter.get_used(diagnostics)
       end
       old_handler.show(namespace, bufnr, diagnostics, opts)
     end,
-    hide = old_handler.hide
+    hide = old_handler.hide,
   }
 end
 
-local hideUnusedDecorations = function (opts)
-  local handlers_copy = vim.tbl_extend("force", {}, require("vim.diagnostic").handlers) -- gets a copy
+---@param opts neodim.opts
+local hide_unused_decorations = function(opts)
+  local handlers_copy = vim.tbl_extend('force', {}, require('vim.diagnostic').handlers) -- gets a copy
   local diag = vim.diagnostic -- updates globally
   for d_handler, enable in pairs(opts.hide) do
     if enable then
-      diag.handlers[d_handler] = createHandler(handlers_copy[d_handler], opts.disable)
+      diag.handlers[d_handler] = create_handler(handlers_copy[d_handler], opts.disable)
     end
   end
 end
 
-local createDimHandlers = function (opts)
+---@param opts neodim.opts
+local create_dim_handlers = function(opts)
+  ---@param bufnr integer
+  ---@param diagnostics Diagnostic[]
   local show = function(_, bufnr, diagnostics, _)
-    local unused_diagnostics = filter.getUnused(diagnostics)
-    ts_override.updateUnused(unused_diagnostics, bufnr)
+    local unused_diagnostics = filter.get_unused(diagnostics)
+    ts_override:update_unused(unused_diagnostics, bufnr)
   end
 
   local hide = function(_, bufnr)
     local is_queued = true
-    vim.api.nvim_create_autocmd({"TextChangedI", "TextChangedP"}, {
-      callback = function ()
+    vim.api.nvim_create_autocmd({ 'TextChangedI', 'TextChangedP' }, {
+      callback = function()
         is_queued = false
       end,
       once = true,
     })
 
-    vim.defer_fn(function ()
+    vim.defer_fn(function()
       if is_queued and vim.api.nvim_buf_is_valid(bufnr) then
         show(_, bufnr, vim.diagnostic.get(bufnr, {}), _)
       end
@@ -58,21 +78,22 @@ local createDimHandlers = function (opts)
 
   return {
     show = show,
-    hide = hide
+    hide = hide,
   }
 end
 
-dim.setup = function (opts)
-  opts = vim.tbl_extend("force", default_opts, opts or {})
-  opts.blend_color = opts.blend_color:gsub('#', '')
+---@param opts neodim.opts
+dim.setup = function(opts)
+  ---@type neodim.opts
+  opts = vim.tbl_extend('force', default_opts, opts or {})
 
-  for _, language in ipairs(opts.disable or {}) do
+  for _, language in ipairs(opts.disable) do
     opts.disable[language] = true
   end
 
-  hideUnusedDecorations(opts)
-  vim.diagnostic.handlers["dim/unused"] = createDimHandlers(opts)
-  ts_override.init(opts)
+  hide_unused_decorations(opts)
+  vim.diagnostic.handlers['dim/unused'] = create_dim_handlers(opts)
+  ts_override = require('neodim.ts_override').init(opts)
 end
 
 return dim
