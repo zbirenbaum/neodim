@@ -27,7 +27,6 @@ TSOverride.init = function(opts)
   -- if that every changes, we will have to override the whole TSHighlighter
   ---@diagnostic disable: invisible
   api.nvim_set_decoration_provider(ns, {
-    on_buf = TSHighlighter._on_buf,
     on_win = TSHighlighter._on_win,
     on_line = self:set_override(),
     _on_spell_nav = TSHighlighter._on_spell_nav,
