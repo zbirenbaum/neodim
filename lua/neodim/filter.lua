@@ -1,9 +1,27 @@
 local filter = {}
 
+local unused_regexes = {
+  '.*[uU]nused.*',
+  '.*[nN]ever [rR]ead.*',
+  '.*[nN]ot [rR]ead.*',
+}
+
+---@param tbl table
+---@param fn function
+---@return boolean
+local any = function(tbl, fn)
+  for _, v in ipairs(tbl) do
+    if fn(v) then return true end
+  end
+  return false
+end
+
 ---@param str string
 ---@return boolean
 local unused_string = function(str)
-  return str and string.find(str, '.*[uU]nused.*') ~= nil
+  return str and any(unused_regexes, function(regex)
+    return string.find(str, regex) ~= nil
+  end)
 end
 
 ---@param diagnostic Diagnostic
