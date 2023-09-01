@@ -2,24 +2,22 @@ local TSHighlighter = require 'vim.treesitter.highlighter'
 local treesitter = require 'vim.treesitter'
 local colors = require 'neodim.colors'
 local lsp = require 'neodim.lsp'
+local opts = require('neodim.config').opts
 local api = vim.api
 
 local ns = api.nvim_create_namespace 'treesitter/highlighter'
 
 ---@class neodim.TSOverride
----@field opts neodim.opts
 ---@field diagnostics_map (true?)[][]
 ---@field hl_map table<string, string>
 local TSOverride = {}
 
----@param opts neodim.opts
 ---@return neodim.TSOverride
-TSOverride.init = function(opts)
+TSOverride.init = function()
   local self = setmetatable({}, {
     __index = TSOverride,
   })
 
-  self.opts = opts
   self.diagnostics_map = {}
   self.hl_map = setmetatable({}, { __mode = 'v' })
 
@@ -56,7 +54,7 @@ end
 ---@param bufnr integer
 TSOverride.update_unused = function(self, diagnostics, bufnr)
   local ft = api.nvim_get_option_value('filetype', { buf = bufnr })
-  if self.opts.disable[ft] then
+  if opts.disable[ft] then
     return
   end
   self.diagnostics_map = {}
@@ -80,7 +78,7 @@ end
 TSOverride.get_dim_color = function(self, hl, hl_name)
   if not self.hl_map[hl_name] and hl and hl.fg then
     local fg = colors.rgb_to_hex(hl.fg)
-    local color = colors.blend(fg, self.opts.blend_color, self.opts.alpha)
+    local color = colors.blend(fg, opts.blend_color, opts.alpha)
     hl.fg = color
     local unused_name = hl_name .. 'Unused'
     api.nvim_set_hl(0, unused_name, hl)
@@ -142,7 +140,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
         local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
         if sttoken_mark_data and self:is_unused(start_row, start_col) then
           hl = self:get_dim_color(sttoken_mark_data.hl_opts, sttoken_mark_data.hl_name)
-          mark.priority = self.opts.priority
+          mark.priority = opts.priority
         elseif hl then
           local capture_name = highlighter_query:query().captures[capture]
 
@@ -152,7 +150,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
 
           if self:is_unused(start_row, start_col) then
             hl = self:get_dim_color(api.nvim_get_hl(0, { id = hl, link = false }), '@' .. capture_name)
-            mark.priority = self.opts.priority
+            mark.priority = opts.priority
           end
           mark.spell = capture_name == 'spell' and true or capture_name == 'nospell' and false or nil
         end
