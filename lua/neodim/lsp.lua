@@ -36,7 +36,7 @@ local function get_sttoken_extmarks(buf, token_range)
   local extmarks = {}
   for name, ns_id in pairs(vim.api.nvim_get_namespaces()) do
     local client_id = name:match 'vim_lsp_semantic_tokens:(%d+)'
-    if client_id and vim.list_contains(client_ids, tonumber(client_id)) then
+    if client_id and vim.tbl_contains(client_ids, tonumber(client_id)) then
       ---@type extmark[]
       local marks = api.nvim_buf_get_extmarks(
         buf,
