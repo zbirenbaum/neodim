@@ -1,0 +1,134 @@
+*neodim.txt*   Neovim plugin for dimming the highlights of unused codes
+
+==============================================================================
+ABOUT                                                             *neodim-about*
+
+This plugin takes heavy inspiration from https://github.com/NarutoXY/dim.lua.
+
+The implementation in NarutoXY/dim.lua was a bit inefficient and I saw room
+for various improvements, including making the dimming an actual LSP handler,
+rather than an autocmd.
+The result is a much more polished experience with greater efficiency.
+
+
+==============================================================================
+REQUIREMENTS                                               *neodim-requirements*
+
+- Neovim ≧ 0.10.0
+- Treesitter
+- Language server supporting DiagnosticTag
+  https://microsoft.github.io/language-server-protocol/specifications/specification-current/#diagnosticTag
+
+
+==============================================================================
+OPTIONS                                                         *neodim-options*
+
+You can pass options to the `setup()` function.
+
+Default value ~
+                                                        *neodim-options-default*
+>lua
+    require("neodim").setup({
+        refresh_delay = 75,
+        alpha = 0.75,
+        blend_color = <background color of `Normal` highlight>,
+        hide = {
+            underline = true,
+            virtual_text = true,
+            signs = true,
+        },
+        priority = 128,
+        disable = {},
+        regex = {
+            "[uU]nused",
+            "[nN]ever [rR]ead",
+            "[nN]ot [rR]ead",
+        },
+    })
+<
+
+alpha ~
+                                                           *neodim-option-alpha*
+
+`alpha` controls how dim the highlight becomes.
+
+A value of 1 means that dimming will do nothing at all, while a value of 0 will
+make it identical to the color set in `blend_color`.
+
+Conceptually, if you were to place the text to be dimmed on a background of
+`blend_color`, and then set the opacity of the text to the value of alpha, you
+would have the resulting color that the plugin highlights with.
+
+blend_color ~
+                                                     *neodim-option-blend_color*
+
+`blend_color` controls the color which is used to dim your highlight.
+
+disable ~
+                                                         *neodim-option-disable*
+
+List of filetypes to disable neodim.
+
+hide ~
+                                                            *neodim-option-hide*
+
+All decorations can be hidden for diagnostics pertaining to unused tokens.
+
+By default, hiding all of them is enabled, but you can re-enable them by
+changing the config table passed to neodim. It is important to note that
+regardless of what you put in this configuration, neodim will always respect
+settings created with `vim.diagnostic.config`. For example, if all underline
+decorations are disabled by running `vim.diagnostic.config({ underline=false })`,
+neodim will NOT re-enable them for "unused" diagnostics.
+
+Example:
+>lua
+    -- re-enable only sign decorations for 'unused' diagnostics
+    require("neodim").setup({
+        hide = { signs = false }
+    })
+
+    -- re-enable all decorations for 'unused' diagnostics
+    require("neodim").setup({
+        hide = {
+            virtual_text = false,
+            signs = false,
+            underline = false,
+        }
+    })
+<
+
+priority ~
+                                                        *neodim-option-priority*
+
+A priority of extmarks used for highlight.
+
+
+refresh_delay ~
+                                                   *neodim-option-refresh_delay*
+
+milli seconds
+
+regex ~
+                                                           *neodim-option-regex*
+
+If the diagnostic message matches one of these, the code to which the
+diagnostic refers is dimmed.
+
+You can set each filetype by entering in a table with the key as the filetype.
+
+Example:
+>lua
+    require("neodim").setup({
+        regex = {
+            "[Uu]nused",
+
+            -- disable `regex` option when filetype is "rust"
+            rust = {},
+        }
+    })
+<
+
+
+==============================================================================
+vim:tw=78:sw=4:ts=4:ft=help:norl:
