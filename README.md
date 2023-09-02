@@ -11,15 +11,20 @@ Neovim 0.10.0 is required for this plugin to work properly.
 {
   "zbirenbaum/neodim",
   event = "LspAttach",
-  config = function ()
+  config = function()
     require("neodim").setup({
       refresh_delay = 75,
       alpha = 0.75,
-      blend_color = '#000000',
+      blend_color = "#000000",
       hide = {
         underline = true,
         virtual_text = true,
-        signs = true ,
+        signs = true,
+      },
+      regex = {
+        "[uU]nused",
+        "[nN]ever [rR]ead",
+        "[nN]ot [rR]ead",
       },
       priority = 128,
       disable = {},
@@ -34,7 +39,7 @@ Neovim 0.10.0 is required for this plugin to work properly.
 
 ##### alpha
 
-Alpha controls how dim the highlight becomes. A value of 1 means that dimming will do nothing at all, while a value of 0 will make it identical to #000000 or the color set in `blend_color`. Conceptually, if you were to place the text to be dimmed on a background of `blend_color`, and then set the opacity of the text to the value of alpha, you would have the resulting color that the plugin highlights with.
+`alpha` controls how dim the highlight becomes. A value of 1 means that dimming will do nothing at all, while a value of 0 will make it identical to #000000 or the color set in `blend_color`. Conceptually, if you were to place the text to be dimmed on a background of `blend_color`, and then set the opacity of the text to the value of alpha, you would have the resulting color that the plugin highlights with.
 
 
 ```lua
@@ -53,6 +58,27 @@ Example:
 require("neodim").setup({
   blend_color = "#10171f"
 })
+```
+
+#### regex
+
+If the diagnostic message matches one of these, the code to which the
+diagnostic refers is dimmed.
+
+You can set up each filetype by entering in a table with the key as the filetype.
+
+Example:
+```lua
+  require("neodim").setup({
+    regex = {
+      "[Uu]nused",
+      cs = {
+        "CS8019",
+      },
+      -- disable `regex` option when filetype is "rust"
+      rust = {},
+    }
+  })
 ```
 
 #### Decoration Options
