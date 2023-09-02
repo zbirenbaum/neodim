@@ -1,27 +1,35 @@
 local filter = {}
 
-local unused_regexes = {
-  '.*[uU]nused.*',
-  '.*[nN]ever [rR]ead.*',
-  '.*[nN]ot [rR]ead.*',
-}
-
----@param tbl table
----@param fn function
----@return boolean
-local any = function(tbl, fn)
-  for _, v in ipairs(tbl) do
-    if fn(v) then return true end
-  end
-  return false
-end
+local config = require 'neodim.config'
 
 ---@param str string
 ---@return boolean
 local unused_string = function(str)
-  return str and any(unused_regexes, function(regex)
-    return string.find(str, regex) ~= nil
-  end)
+  local unused_regexes = config.opts.regex
+
+  if not str or str == '' then
+    return false
+  end
+
+  local regexes
+
+  local ft = vim.api.nvim_get_option_value('filetype', { buf = 0 })
+  if unused_regexes[ft] then
+    ---@cast unused_regexes table<string, string[]>
+    -- don't merge global regexes because there is no way to modify global regexes
+    regexes = unused_regexes[ft]
+  else
+    ---@cast unused_regexes string[]
+    regexes = unused_regexes
+  end
+
+  for _, regex in ipairs(regexes) do
+    if str:find(regex) ~= nil then
+      return true
+    end
+  end
+
+  return false
 end
 
 ---@param diagnostic Diagnostic

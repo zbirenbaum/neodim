@@ -23,6 +23,12 @@ local default_opts = {
   hide = { underline = true, virtual_text = true, signs = true },
   priority = 128,
   disable = {},
+  ---@type string[]|table<string, string[]>
+  regex = {
+    '[uU]nused',
+    '[nN]ever [rR]ead',
+    '[nN]ot [rR]ead',
+  },
 }
 
 ---@type neodim.opts
