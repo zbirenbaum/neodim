@@ -7,9 +7,11 @@ local config = require 'neodim.config'
 local unused_string = function(str)
   local unused_regexes = config.opts.regex
 
-  if not str or str == '' then
+  if not str then
     return false
   end
+
+  str = tostring(str)
 
   local regexes
 
