@@ -21,7 +21,7 @@ TSOverride.init = function()
   self.diagnostics_map = {}
   self.hl_map = setmetatable({}, { __mode = 'v' })
 
-  -- these are 'private' but technically accessable
+  -- these are 'private' but technically accessible
   -- if that every changes, we will have to override the whole TSHighlighter
   ---@diagnostic disable: invisible
   api.nvim_set_decoration_provider(ns, {
@@ -92,26 +92,16 @@ end
 ---@param buf integer
 ---@param line integer
 TSOverride.on_line_impl = function(self, highlighter, buf, line)
-  highlighter.tree:for_each_tree(function(tstree, tree)
-    if not tstree then
-      return
-    end
+  highlighter:for_each_highlight_state(function(state)
+    local root_node = state.tstree:root()
 
-    local root_node = tstree:root()
     local root_start_row, _, root_end_row, _ = root_node:range()
-    -- Only worry about trees within the line range
     if root_start_row > line or root_end_row < line then
       return
     end
-    local state = highlighter:get_highlight_state(tstree)
-    local lang = tree:lang()
-    local highlighter_query = highlighter:get_query(lang)
-    -- Some injected languages may not have highlight queries.
-    if not highlighter_query:query() then
-      return
-    end
+
     if state.iter == nil or state.next_row < line then
-      state.iter = highlighter_query:query():iter_captures(root_node, highlighter.bufnr, line, root_end_row + 1)
+      state.iter = state.highlighter_query:query():iter_captures(root_node, highlighter.bufnr, line, root_end_row + 1)
     end
 
     while line >= state.next_row do
@@ -135,21 +125,28 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
         }
 
         ---@type integer|string highlight id or highlight name
-        local hl = highlighter_query.hl_cache[capture]
+        local hl = state.highlighter_query.hl_cache[capture]
 
         local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
         if sttoken_mark_data and self:is_unused(start_row, start_col) then
           hl = self:get_dim_color(sttoken_mark_data.hl_opts, sttoken_mark_data.hl_name)
           mark.priority = opts.priority
         elseif hl then
-          local capture_name = highlighter_query:query().captures[capture]
+          local capture_name = state.highlighter_query:query().captures[capture]
 
           -- Give nospell a higher priority so it always overrides spell captures.
           local spell_pri_offset = capture_name == 'nospell' and 1 or 0
           mark.priority = (tonumber(metadata.priority) or vim.highlight.priorities.treesitter) + spell_pri_offset -- Low but leaves room below
 
           if self:is_unused(start_row, start_col) then
-            hl = self:get_dim_color(api.nvim_get_hl(0, { id = hl, link = false }), '@' .. capture_name)
+            local hl_opts = nil
+            if type(hl) == 'string' then
+              hl_opts = { name = hl, link = false }
+            else
+              hl_opts = { id = hl, link = false }
+            end
+
+            hl = self:get_dim_color(api.nvim_get_hl(0, hl_opts), '@' .. capture_name)
             mark.priority = opts.priority
           end
           mark.spell = capture_name == 'spell' and true or capture_name == 'nospell' and false or nil
