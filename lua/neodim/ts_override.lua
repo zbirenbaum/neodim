@@ -1,14 +1,19 @@
-local TSHighlighter = require 'vim.treesitter.highlighter'
-local treesitter = require 'vim.treesitter'
+local api = vim.api
+local treesitter = vim.treesitter
+local TSHighlighter = treesitter.highlighter
+
 local colors = require 'neodim.colors'
 local lsp = require 'neodim.lsp'
 local opts = require('neodim.config').opts
-local api = vim.api
 
 local ns = api.nvim_create_namespace 'treesitter/highlighter'
 
+---@class neodim.ColumnRange
+---@field start_col integer
+---@field end_col integer
+
 ---@class neodim.TSOverride
----@field diagnostics_map (true?)[][]
+---@field diagnostics_map table<integer, neodim.ColumnRange[]>
 ---@field hl_map table<string, string>
 local TSOverride = {}
 
@@ -58,18 +63,36 @@ TSOverride.update_unused = function(self, diagnostics, bufnr)
     return
   end
   self.diagnostics_map = {}
-  for _, d in ipairs(diagnostics) do
-    self.diagnostics_map[d.lnum] = self.diagnostics_map[d.lnum] or {}
-    self.diagnostics_map[d.lnum][d.col] = true
+  for _, diagnostic in ipairs(diagnostics) do
+    local start_row, start_col = diagnostic.lnum, diagnostic.col
+    local end_row = diagnostic.end_lnum or start_row
+    local end_col = diagnostic.end_col or start_col
+
+    for row = start_row, end_row do
+      local range  ---@type neodim.ColumnRange
+      if row == start_row then
+        range = { start_col = start_col, end_col = math.huge }
+      elseif row == end_row then
+        range = { start_col = 0, end_col = end_col }
+      else
+        range = { start_col = 0, end_col = math.huge }
+      end
+      self.diagnostics_map[row] = self.diagnostics_map[row] or {}
+      table.insert(self.diagnostics_map[row], range)
+    end
   end
 end
 
----@param self neodim.TSOverride
----@param start_row integer
----@param start_col integer
----@return true?
-TSOverride.is_unused = function(self, start_row, start_col)
-  return self.diagnostics_map[start_row] and self.diagnostics_map[start_row][start_col]
+---@param row integer
+---@param col integer
+---@return boolean
+TSOverride.is_unused = function(self, row, col)
+  for _, range in ipairs(self.diagnostics_map[row] or {}) do
+    if range.start_col <= col and col <= range.end_col then
+      return true
+    end
+  end
+  return false
 end
 
 ---@param hl vim.api.keyset.highlight
