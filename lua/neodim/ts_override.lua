@@ -72,7 +72,9 @@ TSOverride.update_unused = function(self, diagnostics, bufnr)
 
     for row = start_row, end_row do
       local range  ---@type neodim.ColumnRange
-      if row == start_row then
+      if start_row == end_row then
+        range = { start_col = start_col, end_col = end_col }
+      elseif row == start_row then
         range = { start_col = start_col, end_col = math.huge }
       elseif row == end_row then
         range = { start_col = 0, end_col = end_col }
