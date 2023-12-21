@@ -13,7 +13,7 @@ local ns = api.nvim_create_namespace 'treesitter/highlighter'
 ---@field end_col integer
 
 ---@class neodim.TSOverride
----@field diagnostics_map table<integer, neodim.ColumnRange[]>
+---@field diagnostics_map table<buffer, table<integer, neodim.ColumnRange[]>>
 ---@field hl_map table<string, string>
 local TSOverride = {}
 
@@ -62,7 +62,9 @@ TSOverride.update_unused = function(self, diagnostics, bufnr)
   if opts.disable[ft] then
     return
   end
-  self.diagnostics_map = {}
+
+  self.diagnostics_map[bufnr] = {}
+
   for _, diagnostic in ipairs(diagnostics) do
     local start_row, start_col = diagnostic.lnum, diagnostic.col
     local end_row = diagnostic.end_lnum or start_row
@@ -77,8 +79,9 @@ TSOverride.update_unused = function(self, diagnostics, bufnr)
       else
         range = { start_col = 0, end_col = math.huge }
       end
-      self.diagnostics_map[row] = self.diagnostics_map[row] or {}
-      table.insert(self.diagnostics_map[row], range)
+
+      self.diagnostics_map[bufnr][row] = self.diagnostics_map[bufnr][row] or {}
+      table.insert(self.diagnostics_map[bufnr][row], range)
     end
   end
 end
@@ -86,8 +89,11 @@ end
 ---@param row integer
 ---@param col integer
 ---@return boolean
-TSOverride.is_unused = function(self, row, col)
-  for _, range in ipairs(self.diagnostics_map[row] or {}) do
+TSOverride.is_unused = function(self, bufnr, row, col)
+  if not self.diagnostics_map[bufnr] or not self.diagnostics_map[bufnr][row] then
+    return false
+  end
+  for _, range in ipairs(self.diagnostics_map[bufnr][row]) do
     if range.start_col <= col and col <= range.end_col then
       return true
     end
@@ -151,7 +157,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
         local hl = state.highlighter_query.hl_cache[capture]
 
         local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
-        if sttoken_mark_data and self:is_unused(start_row, start_col) then
+        if sttoken_mark_data and self:is_unused(buf, start_row, start_col) then
           hl = self:get_dim_color(sttoken_mark_data.hl_opts, sttoken_mark_data.hl_name)
           mark.priority = opts.priority
         elseif hl then
@@ -161,7 +167,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
           local spell_pri_offset = capture_name == 'nospell' and 1 or 0
           mark.priority = (tonumber(metadata.priority) or vim.highlight.priorities.treesitter) + spell_pri_offset -- Low but leaves room below
 
-          if self:is_unused(start_row, start_col) then
+          if self:is_unused(buf, start_row, start_col) then
             local hl_opts = nil
             if type(hl) == 'string' then
               hl_opts = { name = hl, link = false }
