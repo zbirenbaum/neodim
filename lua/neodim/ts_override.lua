@@ -1,6 +1,6 @@
 local api = vim.api
 local treesitter = vim.treesitter
-local TSHighlighter = treesitter.highlighter
+local TSHighlighter = require 'vim.treesitter.highlighter'
 
 local colors = require 'neodim.colors'
 local lsp = require 'neodim.lsp'
@@ -119,7 +119,7 @@ TSOverride.get_dim_color = function(self, hl, hl_name)
   return self.hl_map[hl_name]
 end
 
----@param highlighter TSHighlighter
+---@param highlighter vim.TSHighlighter
 ---@param buf integer
 ---@param line integer
 TSOverride.on_line_impl = function(self, highlighter, buf, line)
@@ -155,8 +155,8 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
           conceal = metadata.conceal,
         }
 
-        ---@type integer|string highlight id or highlight name
-        local hl = state.highlighter_query.hl_cache[capture]
+        ---@type integer|string? highlight id or highlight name
+        local hl = state.highlighter_query:get_hl_from_capture(capture)
 
         local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
         if sttoken_mark_data and self:is_unused(buf, start_row, start_col) then
