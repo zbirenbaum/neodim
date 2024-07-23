@@ -3,7 +3,6 @@ local M = {}
 local colors = require 'neodim.colors'
 
 local get_bg = function()
-  ---@type vim.api.keyset.highlight
   local normal = vim.api.nvim_get_hl(0, { name = 'Normal', link = false })
   if normal and normal.bg then
     return colors.rgb_to_hex(normal.bg)

@@ -1,6 +1,7 @@
 local api = vim.api
 local treesitter = vim.treesitter
-local TSHighlighter = require 'vim.treesitter.highlighter'
+local TSHighlighter = treesitter.highlighter
+local Range = treesitter._range
 
 local colors = require 'neodim.colors'
 local lsp = require 'neodim.lsp'
@@ -28,13 +29,11 @@ TSOverride.init = function()
 
   -- these are 'private' but technically accessible
   -- if that every changes, we will have to override the whole TSHighlighter
-  ---@diagnostic disable: invisible
   api.nvim_set_decoration_provider(ns, {
-    on_win = TSHighlighter._on_win,
+    on_win = TSHighlighter._on_win, ---@diagnostic disable-line: invisible
     on_line = self:set_override(),
-    _on_spell_nav = TSHighlighter._on_spell_nav,
+    _on_spell_nav = TSHighlighter._on_spell_nav, ---@diagnostic disable-line: invisible
   })
-  ---@diagnostic enable
 
   return self
 end
@@ -55,7 +54,7 @@ TSOverride.set_override = function(self)
   return on_line
 end
 
----@param diagnostics Diagnostic[]
+---@param diagnostics vim.Diagnostic[]
 ---@param bufnr integer
 TSOverride.update_unused = function(self, diagnostics, bufnr)
   local ft = api.nvim_get_option_value('filetype', { buf = bufnr })
@@ -71,7 +70,7 @@ TSOverride.update_unused = function(self, diagnostics, bufnr)
     local end_col = diagnostic.end_col or start_col
 
     for row = start_row, end_row do
-      local range  ---@type neodim.ColumnRange
+      local range ---@type neodim.ColumnRange
       if start_row == end_row then
         range = { start_col = start_col, end_col = end_col }
       elseif row == start_row then
@@ -119,10 +118,11 @@ TSOverride.get_dim_color = function(self, hl, hl_name)
   return self.hl_map[hl_name]
 end
 
----@param highlighter vim.TSHighlighter
+---@param highlighter vim.treesitter.highlighter
 ---@param buf integer
 ---@param line integer
 TSOverride.on_line_impl = function(self, highlighter, buf, line)
+  ---@diagnostic disable-next-line: invisible
   highlighter:for_each_highlight_state(function(state)
     local root_node = state.tstree:root()
 
@@ -132,6 +132,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
     end
 
     if state.iter == nil or state.next_row < line then
+      ---@diagnostic disable-next-line: invisible
       state.iter = state.highlighter_query:query():iter_captures(root_node, highlighter.bufnr, line, root_end_row + 1)
     end
 
@@ -144,7 +145,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
 
       local range = treesitter.get_range(node, buf, metadata[capture])
       ---@type integer, integer, integer, integer, integer, integer
-      local start_row, start_col, _, end_row, end_col, _ = unpack(range)
+      local start_row, start_col, end_row, end_col = Range.unpack4(range)
 
       if end_row >= line then
         ---@type vim.api.keyset.set_extmark
@@ -156,6 +157,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
         }
 
         ---@type integer|string? highlight id or highlight name
+        ---@diagnostic disable-next-line: invisible
         local hl = state.highlighter_query:get_hl_from_capture(capture)
 
         local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
@@ -163,6 +165,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
           hl = self:get_dim_color(sttoken_mark_data.hl_opts, sttoken_mark_data.hl_name)
           mark.priority = opts.priority
         elseif hl then
+          ---@diagnostic disable-next-line: invisible
           local capture_name = state.highlighter_query:query().captures[capture]
 
           -- Give nospell a higher priority so it always overrides spell captures.
@@ -170,14 +173,14 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
           mark.priority = (tonumber(metadata.priority) or vim.highlight.priorities.treesitter) + spell_pri_offset -- Low but leaves room below
 
           if self:is_unused(buf, start_row, start_col) then
-            local hl_opts = nil
+            ---@type vim.api.keyset.get_highlight
+            local hl_opts = { link = false }
             if type(hl) == 'string' then
-              hl_opts = { name = hl, link = false }
+              hl_opts.name = hl
             else
-              hl_opts = { id = hl, link = false }
+              hl_opts.id = hl
             end
-
-            hl = self:get_dim_color(api.nvim_get_hl(0, hl_opts), '@' .. capture_name)
+            hl = self:get_dim_color(api.nvim_get_hl(0, hl_opts) --[[@as vim.api.keyset.highlight]], '@' .. capture_name)
             mark.priority = opts.priority
           end
           mark.spell = capture_name == 'spell' and true or capture_name == 'nospell' and false or nil

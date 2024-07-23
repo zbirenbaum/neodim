@@ -25,7 +25,7 @@ local function get_sttoken_extmarks(buf, token_range)
   local get_clients = vim.lsp.get_clients or vim.lsp.get_active_clients
   ---@type integer[]
   local client_ids = vim.tbl_map(
-    ---@param client lsp.Client
+    ---@param client vim.lsp.Client
     function(client)
       return client.id
     end,
