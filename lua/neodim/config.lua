@@ -16,7 +16,6 @@ end
 
 ---@class neodim.opts
 local default_opts = {
-  refresh_delay = 75,
   alpha = 0.75,
   blend_color = get_bg(),
   hide = { underline = true, virtual_text = true, signs = true },

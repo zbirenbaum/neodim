@@ -30,47 +30,17 @@ local hide_unused_decorations = function()
   end
 end
 
----@return vim.diagnostic.Handler
-local create_dim_handler = function()
-  ---@param bufnr integer
-  ---@param diagnostics vim.Diagnostic[]
-  local show = function(bufnr, diagnostics)
-    local unused_diagnostics = filter.get_unused(diagnostics)
-    ts_override:update_unused(unused_diagnostics, bufnr)
-  end
-
-  ---@param bufnr integer
-  local hide = function(bufnr)
-    local is_queued = true
-    vim.api.nvim_create_autocmd({ 'TextChangedI', 'TextChangedP' }, {
-      callback = function()
-        is_queued = false
-      end,
-      once = true,
-    })
-
-    vim.defer_fn(function()
-      if is_queued and vim.api.nvim_buf_is_valid(bufnr) then
-        show(bufnr, vim.diagnostic.get(bufnr, {}))
-      end
-    end, config.opts.refresh_delay)
-  end
-
-  ---@type vim.diagnostic.Handler
-  return {
-    show = function(_, bufnr, diagnostics, _)
-      show(bufnr, diagnostics)
-    end,
-    hide = function(_, bufnr)
-      hide(bufnr)
-    end,
-  }
-end
-
 dim.setup = function(opts)
   config.setup(opts)
   hide_unused_decorations()
-  vim.diagnostic.handlers['dim/unused'] = create_dim_handler()
+  vim.diagnostic.handlers['dim/unused'] = {
+    show = function(_, bufnr, diagnostics, _)
+      ts_override:update_unused(filter.get_unused(diagnostics), bufnr)
+    end,
+    hide = function(_, bufnr)
+      ts_override:update_unused({}, bufnr)
+    end,
+  }
   ts_override = require('neodim.ts_override').init()
 end
 

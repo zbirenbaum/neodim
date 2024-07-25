@@ -13,7 +13,6 @@ Neovim 0.10.0 is required for this plugin to work properly.
   event = "LspAttach",
   config = function()
     require("neodim").setup({
-      refresh_delay = 75,
       alpha = 0.75,
       blend_color = "#000000",
       hide = {
