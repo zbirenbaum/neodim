@@ -57,8 +57,13 @@ end
 ---@param diagnostics vim.Diagnostic[]
 ---@param bufnr integer
 TSOverride.update_unused = function(self, diagnostics, bufnr)
+  if not api.nvim_buf_is_loaded(bufnr) then
+    self.diagnostics_map[bufnr] = nil
+    return
+  end
   local ft = api.nvim_get_option_value('filetype', { buf = bufnr })
   if opts.disable[ft] then
+    self.diagnostics_map[bufnr] = nil
     return
   end
 
