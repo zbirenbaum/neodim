@@ -164,6 +164,9 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
         ---@type integer|string? highlight id or highlight name
         ---@diagnostic disable-next-line: invisible
         local hl = state.highlighter_query:get_hl_from_capture(capture)
+        if hl == 0 then
+          hl = nil
+        end
 
         local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
         if sttoken_mark_data and self:is_unused(buf, start_row, start_col) then
