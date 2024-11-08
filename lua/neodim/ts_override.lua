@@ -1,13 +1,11 @@
-local api = vim.api
-local treesitter = vim.treesitter
-local TSHighlighter = treesitter.highlighter
-local Range = treesitter._range
+local TSHighlighter = vim.treesitter.highlighter
+local Range = vim.treesitter._range
 
 local colors = require 'neodim.colors'
 local lsp = require 'neodim.lsp'
 local opts = require('neodim.config').opts
 
-local ns = api.nvim_create_namespace 'treesitter/highlighter'
+local NAMESPACE = vim.api.nvim_create_namespace 'treesitter/highlighter'
 
 ---@class neodim.ColumnRange
 ---@field start_col integer
@@ -17,19 +15,21 @@ local ns = api.nvim_create_namespace 'treesitter/highlighter'
 ---@field diagnostics_map table<buffer, table<integer, neodim.ColumnRange[]>>
 ---@field hl_map table<string, string>
 local TSOverride = {}
+---@private
+TSOverride.__index = TSOverride
 
----@return neodim.TSOverride
+---@return self
 TSOverride.init = function()
-  local self = setmetatable({}, {
-    __index = TSOverride,
-  })
-
-  self.diagnostics_map = {}
-  self.hl_map = setmetatable({}, { __mode = 'v' })
+  ---@type neodim.TSOverride
+  local self = {
+    diagnostics_map = {},
+    hl_map = setmetatable({}, { __mode = 'v' }),
+  }
+  setmetatable(self, TSOverride)
 
   -- these are 'private' but technically accessible
   -- if that every changes, we will have to override the whole TSHighlighter
-  api.nvim_set_decoration_provider(ns, {
+  vim.api.nvim_set_decoration_provider(NAMESPACE, {
     on_win = TSHighlighter._on_win, ---@diagnostic disable-line: invisible
     on_line = self:set_override(),
     _on_spell_nav = TSHighlighter._on_spell_nav, ---@diagnostic disable-line: invisible
@@ -57,11 +57,11 @@ end
 ---@param diagnostics vim.Diagnostic[]
 ---@param bufnr integer
 TSOverride.update_unused = function(self, diagnostics, bufnr)
-  if not api.nvim_buf_is_loaded(bufnr) then
+  if not vim.api.nvim_buf_is_loaded(bufnr) then
     self.diagnostics_map[bufnr] = nil
     return
   end
-  local ft = api.nvim_get_option_value('filetype', { buf = bufnr })
+  local ft = vim.api.nvim_get_option_value('filetype', { buf = bufnr })
   if opts.disable[ft] then
     self.diagnostics_map[bufnr] = nil
     return
@@ -116,11 +116,64 @@ TSOverride.get_dim_color = function(self, hl, hl_name)
     local color = colors.blend(fg, opts.blend_color, opts.alpha)
     hl.fg = color
     local unused_name = hl_name .. 'Unused'
-    api.nvim_set_hl(0, unused_name, hl)
+    vim.api.nvim_set_hl(0, unused_name, hl)
     self.hl_map[hl_name] = unused_name
   end
 
   return self.hl_map[hl_name]
+end
+
+---@param mark vim.api.keyset.set_extmark
+---@param buf integer
+---@param start_row integer
+---@param start_col integer
+---@return boolean
+TSOverride.override_mark_with_lsp = function(self, mark, buf, start_row, start_col)
+  local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
+  if sttoken_mark_data and self:is_unused(buf, start_row, start_col) then
+    mark.hl_group = self:get_dim_color(sttoken_mark_data.hl_opts, sttoken_mark_data.hl_name)
+    mark.priority = opts.priority
+    return true
+  end
+  return false
+end
+
+---@param mark vim.api.keyset.set_extmark
+---@param buf integer
+---@param start_row integer
+---@param start_col integer
+---@param hl_query vim.treesitter.highlighter.Query
+---@param capture integer
+---@param metadata vim.treesitter.query.TSMetadata
+---@return boolean
+TSOverride.override_mark_with_ts = function(self, mark, buf, start_row, start_col, hl_query, capture, metadata)
+  ---@diagnostic disable-next-line: invisible
+  local hl = hl_query:get_hl_from_capture(capture)
+  if not hl or hl == 0 then
+    return false
+  end
+  ---@diagnostic disable-next-line: invisible
+  local capture_name = hl_query:query().captures[capture]
+
+  if self:is_unused(buf, start_row, start_col) then
+    mark.hl_group = self:get_dim_color(
+      vim.api.nvim_get_hl(0, { id = hl, link = false }) --[[@as vim.api.keyset.highlight]],
+      '@' .. capture_name
+    )
+    mark.priority = opts.priority
+  else
+    mark.hl_group = hl
+    mark.priority = (tonumber(metadata.priority) or vim.highlight.priorities.treesitter)
+      + (capture_name == 'nospell' and 1 or 0)
+  end
+
+  if capture_name == 'spell' then
+    mark.spell = true
+  elseif capture_name == 'nospell' then
+    mark.spell = false
+  end
+
+  return true
 end
 
 ---@param highlighter vim.treesitter.highlighter
@@ -132,7 +185,7 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
     local root_node = state.tstree:root()
 
     local root_start_row, _, root_end_row, _ = root_node:range()
-    if root_start_row > line or root_end_row < line then
+    if line < root_start_row or root_end_row < line then
       return
     end
 
@@ -141,18 +194,18 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
       state.iter = state.highlighter_query:query():iter_captures(root_node, highlighter.bufnr, line, root_end_row + 1)
     end
 
-    while line >= state.next_row do
+    while state.next_row <= line do
       local capture, node, metadata = state.iter()
 
       if capture == nil then
         break
       end
 
-      local range = treesitter.get_range(node, buf, metadata[capture])
-      ---@type integer, integer, integer, integer, integer, integer
+      local range = vim.treesitter.get_range(node, buf, metadata[capture])
+      ---@type integer, integer, integer, integer
       local start_row, start_col, end_row, end_col = Range.unpack4(range)
 
-      if end_row >= line then
+      if line <= end_row then
         ---@type vim.api.keyset.set_extmark
         local mark = {
           end_line = end_row,
@@ -160,47 +213,15 @@ TSOverride.on_line_impl = function(self, highlighter, buf, line)
           ephemeral = true,
           conceal = metadata.conceal,
         }
-
-        ---@type integer|string? highlight id or highlight name
-        ---@diagnostic disable-next-line: invisible
-        local hl = state.highlighter_query:get_hl_from_capture(capture)
-        if hl == 0 then
-          hl = nil
-        end
-
-        local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
-        if sttoken_mark_data and self:is_unused(buf, start_row, start_col) then
-          hl = self:get_dim_color(sttoken_mark_data.hl_opts, sttoken_mark_data.hl_name)
-          mark.priority = opts.priority
-        elseif hl then
-          ---@diagnostic disable-next-line: invisible
-          local capture_name = state.highlighter_query:query().captures[capture]
-
-          -- Give nospell a higher priority so it always overrides spell captures.
-          local spell_pri_offset = capture_name == 'nospell' and 1 or 0
-          mark.priority = (tonumber(metadata.priority) or vim.highlight.priorities.treesitter) + spell_pri_offset -- Low but leaves room below
-
-          if self:is_unused(buf, start_row, start_col) then
-            ---@type vim.api.keyset.get_highlight
-            local hl_opts = { link = false }
-            if type(hl) == 'string' then
-              hl_opts.name = hl
-            else
-              hl_opts.id = hl
-            end
-            hl = self:get_dim_color(api.nvim_get_hl(0, hl_opts) --[[@as vim.api.keyset.highlight]], '@' .. capture_name)
-            mark.priority = opts.priority
-          end
-          mark.spell = capture_name == 'spell' and true or capture_name == 'nospell' and false or nil
-        end
-
-        if hl then
-          mark.hl_group = hl
-          api.nvim_buf_set_extmark(buf, ns, start_row, start_col, mark)
+        if
+          self:override_mark_with_lsp(mark, buf, start_row, start_col)
+          or self:override_mark_with_ts(mark, buf, start_row, start_col, state.highlighter_query, capture, metadata)
+        then
+          vim.api.nvim_buf_set_extmark(buf, NAMESPACE, start_row, start_col, mark)
         end
       end
 
-      if start_row > line then
+      if line < start_row then
         state.next_row = start_row
       end
     end
