@@ -30,6 +30,7 @@ local hide_unused_decorations = function()
   end
 end
 
+---@param opts neodim.SetupOptions
 dim.setup = function(opts)
   config.setup(opts)
   hide_unused_decorations()

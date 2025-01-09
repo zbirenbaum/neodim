@@ -14,14 +14,29 @@ local get_bg = function()
   end
 end
 
----@class neodim.opts
+---@class neodim.Options
+---@field alpha number
+---@field blend_color string
+---@field hide { underline: boolean?, virtual_text: boolean?, signs: boolean? }
+---@field priority integer
+---@field disable table<string, true>
+---@field regex string[] | table<string, string[]>
+
+---@class neodim.SetupOptions
+---@field alpha? number
+---@field blend_color? string
+---@field hide? { underline: boolean?, virtual_text: boolean?, signs: boolean? }
+---@field priority? integer
+---@field disable? string[]
+---@field regex? string[] | table<string, string[]>
+
+---@type neodim.SetupOptions
 local default_opts = {
   alpha = 0.75,
   blend_color = get_bg(),
   hide = { underline = true, virtual_text = true, signs = true },
   priority = 128,
   disable = {},
-  ---@type string[]|table<string, string[]>
   regex = {
     '[uU]nused',
     '[nN]ever [rR]ead',
@@ -29,10 +44,10 @@ local default_opts = {
   },
 }
 
----@type neodim.opts
-M.opts = {}
+---@type neodim.Options
+M.opts = default_opts --[[@as table]]
 
----@param opts neodim.opts?
+---@param opts neodim.SetupOptions?
 M.setup = function(opts)
   M.opts = vim.tbl_extend('force', default_opts, opts or {})
 
