@@ -1,8 +1,8 @@
 local dim = {}
+
+local TSOverride = require 'neodim.TSOverride'
 local filter = require 'neodim.filter'
 local config = require 'neodim.config'
----@type neodim.TSOverride Initialize in dim.setup()
-local ts_override
 
 ---@param old_handler vim.diagnostic.Handler
 ---@param disable table<string, true>
@@ -34,6 +34,7 @@ end
 dim.setup = function(opts)
   config.setup(opts)
   hide_unused_decorations()
+  local ts_override = TSOverride.init()
   vim.diagnostic.handlers['dim/unused'] = {
     show = function(_, bufnr, diagnostics, _)
       ts_override:update_unused(filter.get_unused(diagnostics), bufnr)
@@ -42,7 +43,6 @@ dim.setup = function(opts)
       ts_override:update_unused({}, bufnr)
     end,
   }
-  ts_override = require('neodim.ts_override').init()
 end
 
 return dim
