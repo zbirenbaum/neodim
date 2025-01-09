@@ -1,7 +1,7 @@
 local TSHighlighter = vim.treesitter.highlighter
 local Range = vim.treesitter._range
 
-local colors = require 'neodim.colors'
+local Color = require 'neodim.Color'
 local lsp = require 'neodim.lsp'
 local opts = require('neodim.config').opts
 
@@ -13,7 +13,7 @@ local NAMESPACE = vim.api.nvim_create_namespace 'treesitter/highlighter'
 
 ---@class neodim.TSOverride
 ---@field diagnostics_map table<buffer, table<integer, neodim.ColumnRange[]>>
----@field hl_map table<string, string>
+---@field highlight_cache table<string, string>
 local TSOverride = {}
 ---@private
 TSOverride.__index = TSOverride
@@ -21,11 +21,10 @@ TSOverride.__index = TSOverride
 ---@return self
 TSOverride.init = function()
   ---@type neodim.TSOverride
-  local self = {
+  local self = setmetatable({
     diagnostics_map = {},
-    hl_map = setmetatable({}, { __mode = 'v' }),
-  }
-  setmetatable(self, TSOverride)
+    highlight_cache = {},
+  }, TSOverride)
 
   -- these are 'private' but technically accessible
   -- if that every changes, we will have to override the whole TSHighlighter
@@ -33,6 +32,14 @@ TSOverride.init = function()
     on_win = TSHighlighter._on_win, ---@diagnostic disable-line: invisible
     on_line = self:set_override(),
     _on_spell_nav = TSHighlighter._on_spell_nav, ---@diagnostic disable-line: invisible
+  })
+  vim.api.nvim_create_autocmd('ColorScheme', {
+    callback = function()
+      for _, hl in pairs(self.highlight_cache) do
+        vim.api.nvim_set_hl(0, hl, {})
+      end
+      self.highlight_cache = {}
+    end,
   })
 
   return self
@@ -111,16 +118,14 @@ end
 ---@param hl_name string
 ---@return string
 TSOverride.get_dim_color = function(self, hl, hl_name)
-  if not self.hl_map[hl_name] and hl and hl.fg then
-    local fg = colors.rgb_to_hex(hl.fg)
-    local color = colors.blend(fg, opts.blend_color, opts.alpha)
-    hl.fg = color
+  if not self.highlight_cache[hl_name] and hl and hl.fg then
+    hl.fg = tostring(Color.from_int(hl.fg):blend(opts.blend_color, opts.alpha))
     local unused_name = hl_name .. 'Unused'
     vim.api.nvim_set_hl(0, unused_name, hl)
-    self.hl_map[hl_name] = unused_name
+    self.highlight_cache[hl_name] = unused_name
   end
 
-  return self.hl_map[hl_name]
+  return self.highlight_cache[hl_name]
 end
 
 ---@param mark vim.api.keyset.set_extmark
