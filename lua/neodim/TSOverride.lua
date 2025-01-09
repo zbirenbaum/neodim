@@ -2,8 +2,8 @@ local TSHighlighter = vim.treesitter.highlighter
 local Range = vim.treesitter._range
 
 local Color = require 'neodim.Color'
+local config = require 'neodim.config'
 local lsp = require 'neodim.lsp'
-local opts = require('neodim.config').opts
 
 local NAMESPACE = vim.api.nvim_create_namespace 'treesitter/highlighter'
 
@@ -69,7 +69,7 @@ TSOverride.update_unused = function(self, diagnostics, bufnr)
     return
   end
   local ft = vim.api.nvim_get_option_value('filetype', { buf = bufnr })
-  if opts.disable[ft] then
+  if config.opts.disable[ft] then
     self.diagnostics_map[bufnr] = nil
     return
   end
@@ -119,7 +119,7 @@ end
 ---@return string
 TSOverride.get_dim_color = function(self, hl, hl_name)
   if not self.highlight_cache[hl_name] and hl and hl.fg then
-    hl.fg = tostring(Color.from_int(hl.fg):blend(opts.blend_color, opts.alpha))
+    hl.fg = tostring(Color.from_int(hl.fg):blend(config.opts.blend_color, config.opts.alpha))
     local unused_name = hl_name .. 'Unused'
     vim.api.nvim_set_hl(0, unused_name, hl)
     self.highlight_cache[hl_name] = unused_name
@@ -137,7 +137,7 @@ TSOverride.override_mark_with_lsp = function(self, mark, buf, start_row, start_c
   local sttoken_mark_data = lsp.get_sttoken_mark_data(buf, start_row, start_col)
   if sttoken_mark_data and self:is_unused(buf, start_row, start_col) then
     mark.hl_group = self:get_dim_color(sttoken_mark_data.hl_opts, sttoken_mark_data.hl_name)
-    mark.priority = opts.priority
+    mark.priority = config.opts.priority
     return true
   end
   return false
@@ -165,7 +165,7 @@ TSOverride.override_mark_with_ts = function(self, mark, buf, start_row, start_co
       vim.api.nvim_get_hl(0, { id = hl, link = false }) --[[@as vim.api.keyset.highlight]],
       '@' .. capture_name
     )
-    mark.priority = opts.priority
+    mark.priority = config.opts.priority
   else
     mark.hl_group = hl
     mark.priority = (tonumber(metadata.priority) or vim.highlight.priorities.treesitter)
