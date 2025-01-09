@@ -20,20 +20,14 @@ local create_handler = function(old_handler, disable)
   }
 end
 
-local hide_unused_decorations = function()
-  local handlers_copy = vim.tbl_extend('force', {}, require('vim.diagnostic').handlers) -- gets a copy
-  local diag = vim.diagnostic -- updates globally
-  for d_handler, enable in pairs(config.opts.hide) do
-    if enable then
-      diag.handlers[d_handler] = create_handler(handlers_copy[d_handler], config.opts.disable)
-    end
-  end
-end
-
 ---@param opts neodim.SetupOptions
 dim.setup = function(opts)
   config.setup(opts)
-  hide_unused_decorations()
+  for d_handler, enable in pairs(config.opts.hide) do
+    if enable then
+      vim.diagnostic.handlers[d_handler] = create_handler(vim.diagnostic.handlers[d_handler], config.opts.disable)
+    end
+  end
   local ts_override = TSOverride.init()
   vim.diagnostic.handlers['dim/unused'] = {
     show = function(_, bufnr, diagnostics, _)

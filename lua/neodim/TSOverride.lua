@@ -3,6 +3,7 @@ local Range = vim.treesitter._range
 
 local Color = require 'neodim.Color'
 local config = require 'neodim.config'
+local list = require 'neodim.list'
 local lsp = require 'neodim.lsp'
 
 local NAMESPACE = vim.api.nvim_create_namespace 'treesitter/highlighter'
@@ -74,7 +75,8 @@ TSOverride.update_unused = function(self, diagnostics, bufnr)
     return
   end
 
-  self.diagnostics_map[bufnr] = {}
+  local map_buf = {}
+  self.diagnostics_map[bufnr] = map_buf
 
   for _, diagnostic in ipairs(diagnostics) do
     local start_row, start_col = diagnostic.lnum, diagnostic.col
@@ -93,8 +95,12 @@ TSOverride.update_unused = function(self, diagnostics, bufnr)
         range = { start_col = 0, end_col = math.huge }
       end
 
-      self.diagnostics_map[bufnr][row] = self.diagnostics_map[bufnr][row] or {}
-      table.insert(self.diagnostics_map[bufnr][row], range)
+      local range_list = map_buf[row]
+      if not range_list then
+        range_list = list.new()
+        map_buf[row] = range_list
+      end
+      list.insert(range_list, range)
     end
   end
 end
@@ -103,10 +109,15 @@ end
 ---@param col integer
 ---@return boolean
 TSOverride.is_unused = function(self, bufnr, row, col)
-  if not self.diagnostics_map[bufnr] or not self.diagnostics_map[bufnr][row] then
+  local map_buf = self.diagnostics_map[bufnr]
+  if not map_buf then
     return false
   end
-  for _, range in ipairs(self.diagnostics_map[bufnr][row]) do
+  local range_list = map_buf[row]
+  if not range_list then
+    return false
+  end
+  for _, range in list.iter(range_list) do
     if range.start_col <= col and col <= range.end_col then
       return true
     end

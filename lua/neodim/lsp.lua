@@ -1,6 +1,8 @@
 local api = vim.api
 
-local lsp = {}
+local list = require 'neodim.list'
+
+local M = {}
 
 ---@alias extmark_data { priority: integer, hl_name: string, hl_opts: table }?
 
@@ -23,32 +25,23 @@ local function get_sttoken_extmarks(buf, token_range)
   -- NOTE: vim.lsp.get_active_clients() was renamed to get_clients() and deprecated on Neovim v0.10
   ---@diagnostic disable-next-line: deprecated
   local get_clients = vim.lsp.get_clients or vim.lsp.get_active_clients
-  ---@type integer[]
-  local client_ids = vim.tbl_map(
-    ---@param client vim.lsp.Client
-    function(client)
-      return client.id
-    end,
-    get_clients { bufnr = buf }
-  )
-
-  ---@type extmark[]
-  local extmarks = {}
-  for name, ns_id in pairs(vim.api.nvim_get_namespaces()) do
-    local client_id = name:match 'vim_lsp_semantic_tokens:(%d+)'
-    if client_id and vim.tbl_contains(client_ids, tonumber(client_id)) then
-      ---@type extmark[]
-      local marks = api.nvim_buf_get_extmarks(
-        buf,
-        ns_id,
-        { token_range.line, token_range.start_col },
-        { token_range.line, token_range.end_col },
-        { type = 'highlight', details = true }
-      )
-      vim.list_extend(extmarks, marks)
-    end
+  ---@type table<integer, true>
+  local client_ids = {}
+  for _, client in pairs(get_clients { bufnr = buf }) do
+    client_ids[client.id] = true
   end
 
+  local start = { token_range.line, token_range.start_col }
+  local end_ = { token_range.line, token_range.end_col }
+  local opts = { type = 'highlight', details = true }
+  ---@type extmark[]
+  local extmarks = list.new()
+  for name, ns_id in pairs(vim.api.nvim_get_namespaces()) do
+    local client_id = name:sub(#'vim_lsp_semantic_tokens:')
+    if client_ids[tonumber(client_id)] then
+      list.extend(extmarks, list.from_raw(api.nvim_buf_get_extmarks(buf, ns_id, start, end_, opts)))
+    end
+  end
   return extmarks
 end
 
@@ -61,11 +54,13 @@ local function get_max_pri_extmark(extmarks)
 
   for _, extmark in ipairs(extmarks) do
     local details = extmark[4]
-    local _hl_opts = api.nvim_get_hl(0, { name = details.hl_group, link = false })
-    if details.priority > priority and not vim.tbl_isempty(_hl_opts) then
-      hl_opts = _hl_opts
-      priority = details.priority
-      hl_name = details.hl_group
+    if priority < details.priority then
+      local _hl_opts = api.nvim_get_hl(0, { name = details.hl_group, link = false })
+      if next(_hl_opts) then
+        hl_opts = _hl_opts
+        priority = details.priority
+        hl_name = details.hl_group
+      end
     end
   end
 
@@ -82,7 +77,7 @@ end
 ---@param row integer
 ---@param col integer
 ---@return extmark_data?
-function lsp.get_sttoken_mark_data(buf, row, col)
+function M.get_sttoken_mark_data(buf, row, col)
   local max_priority = 0
   ---@type extmark_data?
   local mark_data
@@ -100,4 +95,4 @@ function lsp.get_sttoken_mark_data(buf, row, col)
   return mark_data
 end
 
-return lsp
+return M
